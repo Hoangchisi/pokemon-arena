@@ -1,0 +1,102 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- NextAuth Models (Standard) ---
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?   // Dành cho Credentials Auth
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Custom Relation
+  teams         Team[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- App Specific Models ---
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Một team có nhiều Pokemon (tối đa 6, validate ở logic code)
+  pokemons  PokemonBuild[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PokemonBuild {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  pokedexId Int      // ID từ PokéAPI (ví dụ: 25 cho Pikachu)
+  name      String   // Tên gốc hoặc Nickname
+  
+  // Lưu trữ Moves dưới dạng mảng String (tên move hoặc ID move)
+  move1     String
+  move2     String?
+  move3     String?
+  move4     String?
+
+  // Lưu stats đã tính toán (hoặc base stats) để đỡ phải fetch lại khi vào trận
+  hp        Int
+  attack    Int
+  defense   Int
+  spAtk     Int
+  spDef     Int
+  speed     Int
+  
+  types     String[] // ["Electric"] hoặc ["Fire", "Flying"]
+  spriteUrl String?  // URL ảnh front_default
+
+  order     Int      // Thứ tự trong team (slot 1-6)
+}

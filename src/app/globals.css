@@ -1,26 +1,22 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Custom Base Styles */
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100; /* Dark mode mặc định */
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* Giữ nguyên độ sắc nét cho Pixel Art */
+  .pixelated {
+    image-rendering: pixelated;
+  }
+  
+  /* Hiệu ứng Text Shadow nhẹ giúp chữ nổi bật trên nền màu */
+  .text-shadow-sm {
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.5);
+  }
 }
