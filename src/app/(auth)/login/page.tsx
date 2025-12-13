@@ -4,40 +4,39 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { toast } from "react-hot-toast"; // Dùng để thông báo lỗi đẹp hơn
-import { Loader2, LogIn, Chrome } from "lucide-react"; // Icon
+import { toast } from "react-hot-toast";
+import { Loader2, LogIn, Chrome } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  
-  // State lưu input của form
   const [data, setData] = useState({
     email: "",
     password: ""
   });
 
-  // Xử lý Login bằng Email/Password
+  // 1. Xử lý Login bằng Email/Password
   const loginWithCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Gọi hàm signIn của NextAuth
-      // redirect: false -> Để chúng ta tự xử lý chuyển trang hoặc báo lỗi
       const callback = await signIn("credentials", {
         ...data,
         redirect: false, 
       });
 
       if (callback?.error) {
-        toast.error("Invalid credentials!"); // Báo lỗi nếu sai mk
+        toast.error("Invalid credentials!");
       }
 
       if (callback?.ok && !callback?.error) {
         toast.success("Logged in successfully!");
-        router.push("/"); // Chuyển hướng sau khi đăng nhập thành công
-        router.refresh(); // Refresh để cập nhật Session mới nhất
+        
+        // --- SỬA Ở ĐÂY: Chuyển về trang chủ "/" ---
+        router.push("/"); 
+        
+        router.refresh(); 
       }
     } catch (error) {
       toast.error("Something went wrong!");
@@ -46,28 +45,26 @@ export default function LoginPage() {
     }
   };
 
-  // Xử lý Login bằng Google
+  // 2. Xử lý Login bằng Google
   const loginWithGoogle = () => {
     setIsLoading(true);
-    signIn("google", { callbackUrl: "/dashboard/builder" });
+    // --- SỬA Ở ĐÂY: callbackUrl chuyển về "/" ---
+    signIn("google", { callbackUrl: "/" });
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       
-      {/* Background Decor */}
+      {/* (Giữ nguyên phần UI trang trí và Form nhập liệu như cũ) */}
       <div className="absolute top-0 -left-20 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-0 -right-20 w-96 h-96 bg-red-600/20 rounded-full blur-[100px] pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl animate-in fade-in zoom-in duration-500">
-        
-        {/* Header */}
+      <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Welcome Trainer!</h1>
-          <p className="text-slate-400 text-sm">Sign in to access your Team & Arena.</p>
+          <p className="text-slate-400 text-sm">Sign in to access Pokemon Battle.</p>
         </div>
 
-        {/* Form */}
         <form onSubmit={loginWithCredentials} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
@@ -103,7 +100,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t border-slate-700" />
@@ -113,17 +109,15 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Social Login */}
         <button
           onClick={loginWithGoogle}
           disabled={isLoading}
           className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
         >
-          <Chrome size={20} /> {/* Icon minh họa cho Google */}
+          <Chrome size={20} />
           Google
         </button>
 
-        {/* Footer */}
         <div className="mt-6 text-center text-sm text-slate-400">
           Don't have an account?{" "}
           <Link href="/register" className="text-blue-400 hover:underline">

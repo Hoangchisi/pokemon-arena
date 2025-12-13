@@ -1,20 +1,28 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import { PrismaAdapter } from "@next-auth/prisma-adapter"; // Import Adapter
 import { prisma } from "@/lib/db";
-import bcrypt from "bcryptjs"; // Nhớ cài: npm i bcryptjs @types/bcryptjs
+import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
+  // 1. KẾT NỐI PRISMA ADAPTER (Tự động tạo User/Account trong DB)
   adapter: PrismaAdapter(prisma),
+
   session: {
-    strategy: "jwt", // Dùng JWT để linh hoạt hơn với Credentials
+    strategy: "jwt", // Dùng JWT để linh hoạt, không bắt buộc query DB mỗi lần F5
   },
+  
   providers: [
+    // 2. CẤU HÌNH GOOGLE
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Cho phép link tài khoản Google với tài khoản Email đã tồn tại
+      allowDangerousEmailAccountLinking: true, 
     }),
+
+    // 3. CẤU HÌNH LOGIN BẰNG MẬT KHẨU
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -28,6 +36,7 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email }
         });
 
+        // Nếu không có user hoặc user đó tạo bằng Google (không có password)
         if (!user || !user.password) return null;
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
@@ -38,15 +47,25 @@ export const authOptions: NextAuthOptions = {
       }
     }),
   ],
+
+  // 4. CALLBACKS: Chuyển ID từ DB vào Session
   callbacks: {
+    async jwt({ token, user, account }) {
+      // Khi mới login (có user object)
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.sub!; // Gán ID vào session để dùng ở Client
+      if (session.user && token) {
+        // @ts-ignore
+        session.user.id = token.id as string;
       }
       return session;
     }
   },
   pages: {
-    signIn: '/login', // Custom login page
+    signIn: '/login', // Đường dẫn trang login của bạn
   }
 };
