@@ -8,7 +8,7 @@ import { useBattleStore } from "@/hooks/useBattleStore";
 import { mapTeamToBattleTeam } from "@/lib/battle-mapper";
 import { toast } from "react-hot-toast";
 
-// Giữ lại NPC Mock để có đối thủ
+// --- CẬP NHẬT ĐỘI HÌNH NPC TẠI ĐÂY ---
 const MOCK_NPC_TEAM = [
   {
     pokedexId: 150,
@@ -25,6 +25,15 @@ const MOCK_NPC_TEAM = [
     spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png",
     stats: { hp: 78, attack: 84, defense: 78, spAtk: 109, spDef: 85, speed: 100 },
     selectedMoves: ["flamethrower", "air-slash", "dragon-pulse", "roost"]
+  },
+  // --- THÊM GENGAR VÀO ĐÂY ---
+  {
+    pokedexId: 94,
+    name: "gengar",
+    types: ["ghost", "poison"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/94.png",
+    stats: { hp: 60, attack: 65, defense: 60, spAtk: 130, spDef: 75, speed: 110 },
+    selectedMoves: ["shadow-ball", "sludge-bomb", "dark-pulse", "dazzling-gleam"]
   }
 ];
 
@@ -32,13 +41,12 @@ export default function ArenaLobbyPage() {
   const router = useRouter();
   const { setupBattle } = useBattleStore();
 
-  // State
-  const [isLoading, setIsLoading] = useState(false); // Loading khi start battle
-  const [isFetching, setIsFetching] = useState(true); // Loading khi fetch team list
+  const [isLoading, setIsLoading] = useState(false); 
+  const [isFetching, setIsFetching] = useState(true); 
   const [myTeams, setMyTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
 
-  // 1. Fetch User Teams từ Database
+  // 1. Fetch User Teams
   useEffect(() => {
     const fetchTeams = async () => {
       try {
@@ -54,7 +62,6 @@ export default function ArenaLobbyPage() {
         const data = await res.json();
         setMyTeams(data);
         
-        // Tự động chọn team mới nhất nếu có
         if (data.length > 0) {
           setSelectedTeamId(data[0].id);
         }
@@ -69,11 +76,10 @@ export default function ArenaLobbyPage() {
     fetchTeams();
   }, [router]);
 
-  // 2. Xử lý Start Battle
+  // 2. Start Battle Handler
   const handleStartBattle = async () => {
     if (!selectedTeamId) return toast.error("Please select a team!");
     
-    // Tìm object team đầy đủ dựa trên ID đã chọn
     const selectedTeam = myTeams.find(t => t.id === selectedTeamId);
     if (!selectedTeam) return;
 
@@ -84,16 +90,15 @@ export default function ArenaLobbyPage() {
     setIsLoading(true);
     
     try {
-      console.log("Mapping User Team...", selectedTeam.name);
+      console.log("Mapping Battle Data...");
       
-      // Map Team từ DB sang Battle format
+      // Map User Team
       const playerBattleTeam = await mapTeamToBattleTeam(selectedTeam.pokemons);
       
-      // Map NPC Team (NPC cũng dùng hàm map để lấy stats chuẩn của move)
+      // Map NPC Team
       const enemyBattleTeam = await mapTeamToBattleTeam(MOCK_NPC_TEAM);
 
-      // Setup Store: Lấy con đầu tiên ra đấu (Logic 1vs1)
-      // Nếu sau này làm 6vs6 thì logic Store cần sửa đổi để nhận cả mảng
+      // Setup Store (6vs6)
       setupBattle(playerBattleTeam, enemyBattleTeam);
 
       router.push("/arena/active"); 
@@ -110,7 +115,6 @@ export default function ArenaLobbyPage() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
         
-        {/* Decor */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
 
         <div className="flex justify-center mb-4">
@@ -128,14 +132,12 @@ export default function ArenaLobbyPage() {
           </p>
         </div>
 
-        {/* --- MAIN CONTENT AREA --- */}
         {isFetching ? (
           <div className="py-8 flex flex-col items-center text-slate-500">
             <Loader2 className="animate-spin mb-2" />
             <span>Loading your teams...</span>
           </div>
         ) : myTeams.length === 0 ? (
-          // Case: Chưa có Team nào
           <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg p-4 text-sm text-yellow-200 flex flex-col items-center gap-3">
             <AlertCircle size={24} />
             <p>You don't have any teams yet.</p>
@@ -147,7 +149,6 @@ export default function ArenaLobbyPage() {
             </Link>
           </div>
         ) : (
-          // Case: Đã có Team -> Chọn Team
           <div className="space-y-4 text-left">
             <label className="block text-xs font-bold text-slate-500 uppercase">
               Select Your Team
@@ -170,7 +171,6 @@ export default function ArenaLobbyPage() {
               </div>
             </div>
 
-            {/* Preview Team nhỏ (Optional) */}
             <div className="flex gap-2 justify-center py-2 h-12">
                {myTeams.find(t => t.id === selectedTeamId)?.pokemons.map((p: any) => (
                  <img key={p.id} src={p.spriteUrl} alt={p.name} className="h-10 w-10 pixelated object-contain bg-slate-800 rounded-full border border-slate-700" title={p.name} />

@@ -7,18 +7,26 @@ interface BattleState {
   enemyTeam: BattlePokemon[];
   activePlayerIndex: number;
   activeEnemyIndex: number;
-  
   logs: string[];
   isPlayerTurn: boolean;
   winner: 'PLAYER' | 'ENEMY' | null;
   mustSwitch: boolean;
   
-  // Actions
+  // --- STATE MỚI CHO ANIMATION ---
+  attackingSide: 'player' | 'enemy' | null; 
+
   setupBattle: (myTeam: BattlePokemon[], enemyTeam: BattlePokemon[]) => void;
   executeTurn: (playerMove: Move) => Promise<void>;
   switchPokemon: (index: number) => void;
-  performEnemyTurn: () => Promise<void>; // Hàm mới: Enemy tự đánh
+  performEnemyTurn: () => Promise<void>;
 }
+
+const getEffectivenessText = (effectiveness: number, pokemonName: string) => {
+  if (effectiveness === 0) return `It doesn't affect ${pokemonName}...`;
+  if (effectiveness > 0 && effectiveness < 1) return "It's not very effective...";
+  if (effectiveness > 1) return "It's super effective!";
+  return null;
+};
 
 export const useBattleStore = create<BattleState>((set, get) => ({
   myTeam: [],
@@ -29,85 +37,36 @@ export const useBattleStore = create<BattleState>((set, get) => ({
   isPlayerTurn: true,
   winner: null,
   mustSwitch: false,
+  attackingSide: null, // Mặc định không ai đánh
 
   setupBattle: (myTeam, enemyTeam) => {
     if (!myTeam || myTeam.length === 0 || !enemyTeam || enemyTeam.length === 0) return;
     set({
-      myTeam,
-      enemyTeam,
-      activePlayerIndex: 0,
-      activeEnemyIndex: 0,
+      myTeam, enemyTeam, activePlayerIndex: 0, activeEnemyIndex: 0,
       logs: [`Battle Start! Go ${myTeam[0].name}!`],
-      winner: null,
-      isPlayerTurn: true,
-      mustSwitch: false
+      winner: null, isPlayerTurn: true, mustSwitch: false, attackingSide: null
     });
   },
 
-  // --- LOGIC ENEMY ĐÁNH (Được tách riêng) ---
-  performEnemyTurn: async () => {
-    const state = get();
-    if (state.winner) return;
-
-    const playerMon = state.myTeam[state.activePlayerIndex];
-    const enemyMon = state.enemyTeam[state.activeEnemyIndex];
-
-    // 1. Enemy chọn chiêu (Random hoặc AI đơn giản)
-    const enemyMove = enemyMon.moves[0]; // Tạm lấy chiêu đầu
-    
-    // 2. Tính Damage
-    const dmgToPlayer = calculateDamage(enemyMon, playerMon, enemyMove).damage;
-    const newPlayerHp = Math.max(0, playerMon.currentHp - dmgToPlayer);
-
-    // 3. Cập nhật State
-    const newMyTeam = [...state.myTeam];
-    newMyTeam[state.activePlayerIndex] = { ...playerMon, currentHp: newPlayerHp };
-
-    set(s => ({ 
-      myTeam: newMyTeam,
-      logs: [...s.logs, `Enemy ${enemyMon.name} used ${enemyMove.name}!`]
-    }));
-
-    // 4. Check Player Fainted?
-    if (newPlayerHp === 0) {
-      set(s => ({ logs: [...s.logs, `${playerMon.name} fainted!`] }));
-      
-      const hasAlive = newMyTeam.some(p => p.currentHp > 0);
-      if (!hasAlive) {
-        set({ winner: 'ENEMY', logs: [...get().logs, "You have no Pokemon left! You Lose!"] });
-      } else {
-        set({ mustSwitch: true, logs: [...get().logs, "Choose your next Pokemon!"] });
-      }
-    } else {
-      // Nếu Player còn sống -> Trả lượt cho Player
-      set({ isPlayerTurn: true });
-    }
-  },
-
-  // --- LOGIC ĐỔI POKEMON ---
   switchPokemon: (index) => {
     const { myTeam, activePlayerIndex, mustSwitch } = get();
     if (myTeam[index].currentHp === 0 || index === activePlayerIndex) return;
 
     set((state) => ({
       activePlayerIndex: index,
-      mustSwitch: false, // Tắt trạng thái bắt buộc
+      mustSwitch: false,
       logs: [...state.logs, `Go! ${state.myTeam[index].name}!`]
     }));
     
-    // CASE 1: Đổi do bị chết (Forced) -> Được quyền đánh tiếp (New Turn)
     if (mustSwitch) {
         set({ isPlayerTurn: true });
-    } 
-    // CASE 2: Chủ động đổi (Manual) -> Mất lượt, Enemy đánh
-    else {
+    } else {
         set({ isPlayerTurn: false });
-        // Gọi Enemy đánh sau 1s
         setTimeout(() => get().performEnemyTurn(), 1000); 
     }
   },
 
-  // --- LOGIC PLAYER ĐÁNH ---
+  // --- LOGIC PLAYER ĐÁNH (CÓ ANIMATION) ---
   executeTurn: async (playerMove) => {
     const state = get();
     if (state.winner || state.mustSwitch || !state.isPlayerTurn) return;
@@ -115,23 +74,33 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     const playerMon = state.myTeam[state.activePlayerIndex];
     const enemyMon = state.enemyTeam[state.activeEnemyIndex];
 
-    set({ isPlayerTurn: false }); // Khóa lượt
+    // 1. Kích hoạt Animation & Khóa lượt
+    set({ isPlayerTurn: false, attackingSide: 'player' });
 
-    // 1. Player Attack
-    const dmgToEnemy = calculateDamage(playerMon, enemyMon, playerMove).damage;
-    const newEnemyHp = Math.max(0, enemyMon.currentHp - dmgToEnemy);
+    // 2. Chờ 300ms cho Pokemon lao lên
+    await new Promise(r => setTimeout(r, 300));
+
+    // 3. Tính toán DMG
+    const { damage, effectiveness, isCritical } = calculateDamage(playerMon, enemyMon, playerMove);
+    const newEnemyHp = Math.max(0, enemyMon.currentHp - damage);
     
+    let newLogs = [...state.logs, `${playerMon.name} used ${playerMove.name}!`];
+    if (isCritical) newLogs.push("A critical hit!");
+    const effText = getEffectivenessText(effectiveness, enemyMon.name);
+    if (effText) newLogs.push(effText);
+
     const newEnemyTeam = [...state.enemyTeam];
     newEnemyTeam[state.activeEnemyIndex] = { ...enemyMon, currentHp: newEnemyHp };
     
-    set(s => ({ 
-      enemyTeam: newEnemyTeam,
-      logs: [...s.logs, `${playerMon.name} used ${playerMove.name}!`]
-    }));
+    // 4. Cập nhật HP & Reset Animation (Pokemon lùi về)
+    set({ 
+        enemyTeam: newEnemyTeam, 
+        logs: newLogs,
+        attackingSide: null // <-- Reset để kích hoạt transition lùi về
+    });
     
     await new Promise(r => setTimeout(r, 1000));
 
-    // 2. Check Enemy Fainted
     if (newEnemyHp === 0) {
       set(s => ({ logs: [...s.logs, `Enemy ${enemyMon.name} fainted!`] }));
       const nextEnemyIndex = newEnemyTeam.findIndex(p => p.currentHp > 0);
@@ -139,18 +108,59 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       if (nextEnemyIndex === -1) {
         set({ winner: 'PLAYER', logs: [...get().logs, "You Win!"] });
       } else {
-        // Enemy đổi Pokemon
         await new Promise(r => setTimeout(r, 1000));
-        set({ 
-          activeEnemyIndex: nextEnemyIndex,
-          isPlayerTurn: true, 
-          logs: [...get().logs, `Enemy sent out ${newEnemyTeam[nextEnemyIndex].name}!`]
-        });
+        set({ activeEnemyIndex: nextEnemyIndex, isPlayerTurn: true, logs: [...get().logs, `Enemy sent out ${newEnemyTeam[nextEnemyIndex].name}!`] });
       }
       return;
     }
 
-    // 3. Nếu Enemy còn sống -> Enemy đánh lại
     await get().performEnemyTurn();
+  },
+
+  // --- LOGIC ENEMY ĐÁNH (CÓ ANIMATION) ---
+  performEnemyTurn: async () => {
+    const state = get();
+    if (state.winner) return;
+
+    const playerMon = state.myTeam[state.activePlayerIndex];
+    const enemyMon = state.enemyTeam[state.activeEnemyIndex];
+    const enemyMove = enemyMon.moves[Math.floor(Math.random() * enemyMon.moves.length)];
+    
+    // 1. Kích hoạt Animation
+    set({ attackingSide: 'enemy' });
+
+    // 2. Chờ 300ms
+    await new Promise(r => setTimeout(r, 300));
+
+    // 3. Tính toán
+    const { damage, effectiveness, isCritical } = calculateDamage(enemyMon, playerMon, enemyMove);
+    const newPlayerHp = Math.max(0, playerMon.currentHp - damage);
+
+    let newLogs = [...state.logs, `Enemy ${enemyMon.name} used ${enemyMove.name}!`];
+    if (isCritical) newLogs.push("A critical hit!");
+    const effText = getEffectivenessText(effectiveness, playerMon.name);
+    if (effText) newLogs.push(effText);
+
+    const newMyTeam = [...state.myTeam];
+    newMyTeam[state.activePlayerIndex] = { ...playerMon, currentHp: newPlayerHp };
+
+    // 4. Cập nhật HP & Reset Animation
+    set({ 
+        myTeam: newMyTeam, 
+        logs: newLogs,
+        attackingSide: null 
+    });
+
+    if (newPlayerHp === 0) {
+      set(s => ({ logs: [...s.logs, `${playerMon.name} fainted!`] }));
+      const hasAlive = newMyTeam.some(p => p.currentHp > 0);
+      if (!hasAlive) {
+        set({ winner: 'ENEMY', logs: [...get().logs, "You Lose!"] });
+      } else {
+        set({ mustSwitch: true, logs: [...get().logs, "Choose next Pokemon!"] });
+      }
+    } else {
+      set({ isPlayerTurn: true });
+    }
   }
 }));

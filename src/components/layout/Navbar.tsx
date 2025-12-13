@@ -31,7 +31,11 @@ export function Navbar() {
             href="/" 
             className="flex items-center gap-2 text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
           >
-            <Swords className="text-blue-500" />
+            <img 
+              src="/logo.png" 
+              alt="PokeArena Logo" 
+              className="w-8 h-8"
+            />
             <span className="hidden md:inline">PokeArena</span>
           </Link>
 

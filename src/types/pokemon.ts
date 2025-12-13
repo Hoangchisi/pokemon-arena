@@ -7,17 +7,22 @@ export interface PokeStats {
   speed: number;
 }
 
+// Định nghĩa mới cho Move
+export interface MoveData {
+  name: string;
+  type: string; // Thêm trường này để tô màu
+}
+
 export interface PokemonData {
   id: number;
   name: string;
   types: string[];
   sprite: string;
   stats: PokeStats;
-  moves: string[]; // Danh sách toàn bộ moves có thể học
+  moves: MoveData[]; // Sửa từ string[] thành MoveData[]
 }
 
-// Dạng dữ liệu rút gọn dùng cho UI Team Slot
 export interface TeamMember extends PokemonData {
-  selectedMoves: string[]; // Tối đa 4 move user đã chọn
-  uuid: string; // ID tạm để render list key (do 1 team có thể có 2 Pikachu)
+  selectedMoves: string[]; 
+  uuid: string;
 }

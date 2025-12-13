@@ -33,7 +33,7 @@ export default function LoginPage() {
       if (callback?.ok && !callback?.error) {
         toast.success("Logged in successfully!");
         
-        // --- SỬA Ở ĐÂY: Chuyển về trang chủ "/" ---
+        // Chuyển về trang chủ "/" ---
         router.push("/"); 
         
         router.refresh(); 
