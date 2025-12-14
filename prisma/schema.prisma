@@ -1,15 +1,14 @@
-// schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
-// --- NextAuth Models (Standard) ---
+// --- NEXTAUTH MODELS (Bắt buộc cho Login Google + Credentials) ---
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -29,38 +28,38 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
-model Account {
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
- 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
- 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
-  @@id([provider, providerAccountId])
-}
-
 model Session {
+  id           String   @id @default(cuid())
   sessionToken String   @unique
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
-// --- App Specific Models ---
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Bắt buộc cho Login bằng Mật khẩu
+  
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Quan hệ với App (Team Builder)
+  teams         Team[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- APP MODELS (Pokemon Team Builder) ---
 
 model Team {
   id        String   @id @default(cuid())
@@ -68,7 +67,7 @@ model Team {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Một team có nhiều Pokemon (tối đa 6, validate ở logic code)
+  // Một Team có nhiều Pokemon
   pokemons  PokemonBuild[]
 
   createdAt DateTime @default(now())
@@ -76,29 +75,30 @@ model Team {
 }
 
 model PokemonBuild {
-  id        String   @id @default(cuid())
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
-  pokedexId Int      // ID từ PokéAPI (ví dụ: 25 cho Pikachu)
-  name      String   // Tên gốc hoặc Nickname
-  
-  // Lưu trữ Moves dưới dạng mảng String (tên move hoặc ID move)
-  move1     String
-  move2     String?
-  move3     String?
-  move4     String?
+  id          String   @id @default(cuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  // Lưu stats đã tính toán (hoặc base stats) để đỡ phải fetch lại khi vào trận
-  hp        Int
-  attack    Int
-  defense   Int
-  spAtk     Int
-  spDef     Int
-  speed     Int
+  pokedexId   Int
+  name        String
   
-  types     String[] // ["Electric"] hoặc ["Fire", "Flying"]
-  spriteUrl String?  // URL ảnh front_default
+  // Moves (Lưu tên chiêu thức)
+  move1       String
+  move2       String?
+  move3       String?
+  move4       String?
 
-  order     Int      // Thứ tự trong team (slot 1-6)
+  // Stats (Lưu chỉ số tại thời điểm build)
+  hp          Int
+  attack      Int
+  defense     Int
+  spAtk       Int
+  spDef       Int
+  speed       Int
+  
+  // Info
+  types       String[] // Lưu mảng string (VD: ["fire", "flying"])
+  spriteUrl   String?
+  
+  order       Int      // Vị trí trong team (0-5)
 }
