@@ -8,32 +8,61 @@ import { useBattleStore } from "@/hooks/useBattleStore";
 import { mapTeamToBattleTeam } from "@/lib/battle-mapper";
 import { toast } from "react-hot-toast";
 
-// --- CẬP NHẬT ĐỘI HÌNH NPC TẠI ĐÂY ---
 const MOCK_NPC_TEAM = [
+  // 1. Spiritomb (Ghost/Dark) - Không có điểm yếu (trừ Fairy)
   {
-    pokedexId: 150,
-    name: "mewtwo",
-    types: ["psychic"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png",
-    stats: { hp: 106, attack: 110, defense: 90, spAtk: 154, spDef: 90, speed: 130 },
-    selectedMoves: ["psychic", "shadow-ball", "aura-sphere", "recover"]
+    pokedexId: 442,
+    name: "spiritomb",
+    types: ["ghost", "dark"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/442.png",
+    // Stats thực tế ở Lv.50 (tương đối)
+    stats: { hp: 157, attack: 114, defense: 130, spAtk: 114, spDef: 130, speed: 55 },
+    selectedMoves: ["shadow-ball", "dark-pulse", "psychic", "sucker-punch"]
   },
+  // 2. Roserade (Grass/Poison) - Sp.Atk cực cao
   {
-    pokedexId: 6,
-    name: "charizard",
-    types: ["fire", "flying"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png",
-    stats: { hp: 78, attack: 84, defense: 78, spAtk: 109, spDef: 85, speed: 100 },
-    selectedMoves: ["flamethrower", "air-slash", "dragon-pulse", "roost"]
+    pokedexId: 407,
+    name: "roserade",
+    types: ["grass", "poison"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/407.png",
+    stats: { hp: 135, attack: 90, defense: 85, spAtk: 177, spDef: 125, speed: 142 },
+    selectedMoves: ["energy-ball", "sludge-bomb", "shadow-ball", "dazzling-gleam"]
   },
-  // --- THÊM GENGAR VÀO ĐÂY ---
+  // 3. Gastrodon (Water/Ground) - Tanker, chỉ sợ Cỏ
   {
-    pokedexId: 94,
-    name: "gengar",
-    types: ["ghost", "poison"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/94.png",
-    stats: { hp: 60, attack: 65, defense: 60, spAtk: 130, spDef: 75, speed: 110 },
-    selectedMoves: ["shadow-ball", "sludge-bomb", "dark-pulse", "dazzling-gleam"]
+    pokedexId: 423,
+    name: "gastrodon",
+    types: ["water", "ground"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/423.png",
+    stats: { hp: 218, attack: 103, defense: 88, spAtk: 114, spDef: 102, speed: 59 },
+    selectedMoves: ["earth-power", "muddy-water", "sludge-bomb", "ice-beam"]
+  },
+  // 4. Lucario (Fighting/Steel) - Attacker toàn diện
+  {
+    pokedexId: 448,
+    name: "lucario",
+    types: ["fighting", "steel"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/448.png",
+    stats: { hp: 145, attack: 132, defense: 90, spAtk: 137, spDef: 90, speed: 142 },
+    selectedMoves: ["aura-sphere", "flash-cannon", "dragon-pulse", "earthquake"]
+  },
+  // 5. Milotic (Water) - Sp.Def Tank cực trâu
+  {
+    pokedexId: 350,
+    name: "milotic",
+    types: ["water"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/350.png",
+    stats: { hp: 202, attack: 81, defense: 99, spAtk: 122, spDef: 147, speed: 101 },
+    selectedMoves: ["hydro-pump", "ice-beam", "dragon-pulse", "recover"]
+  },
+  // 6. Garchomp (Dragon/Ground) - ACE chủ lực, siêu mạnh & nhanh
+  {
+    pokedexId: 445,
+    name: "garchomp",
+    types: ["dragon", "ground"],
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/445.png",
+    stats: { hp: 183, attack: 182, defense: 115, spAtk: 100, spDef: 105, speed: 169 },
+    selectedMoves: ["dragon-claw", "earthquake", "stone-edge", "swords-dance"]
   }
 ];
 
