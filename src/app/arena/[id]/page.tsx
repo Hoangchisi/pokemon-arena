@@ -6,10 +6,17 @@ import { TypeBadge } from '@/components/ui/TypeBadge';
 
 export default function BattlePage() {
   const { 
-    playerPokemon, enemyPokemon, logs, isPlayerTurn, winner,
-    setupBattle, executeTurn 
-  } = useBattleStore();
-
+  myTeam, 
+  enemyTeam, 
+  activePlayerIndex, 
+  activeEnemyIndex, 
+  logs, 
+  isPlayerTurn, 
+  winner,
+  executeTurn 
+} = useBattleStore();
+  const playerPokemon = myTeam[activePlayerIndex];
+  const enemyPokemon = enemyTeam[activeEnemyIndex];
   // Mock init battle (Thực tế bạn sẽ lấy data từ API/Props)
   useEffect(() => {
     // Gọi API lấy team user và NPC, sau đó setup
