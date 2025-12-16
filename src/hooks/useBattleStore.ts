@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { BattlePokemon, Move } from '@/types/battle';
 import { calculateDamage } from '@/lib/battle-logic';
 
+// --- DANH SÁCH BACKGROUND (Chuyển vào đây) ---
+const ARENA_BACKGROUNDS = [
+  "/backgrounds/arena/bg-1.png",
+  "/backgrounds/arena/bg-2.png",
+  "/backgrounds/arena/bg-3.png",
+  "/backgrounds/arena/bg-4.png",
+  "/backgrounds/arena/bg-5.png",
+];
+
 interface BattleState {
   myTeam: BattlePokemon[];
   enemyTeam: BattlePokemon[];
@@ -12,11 +21,13 @@ interface BattleState {
   winner: 'PLAYER' | 'ENEMY' | null;
   mustSwitch: boolean;
   attackingSide: 'player' | 'enemy' | null;
+  
+  // --- STATE MỚI: LƯU BACKGROUND CỐ ĐỊNH CHO TRẬN ĐẤU ---
+  battleBackground: string | null;
 
   setupBattle: (myTeam: BattlePokemon[], enemyTeam: BattlePokemon[]) => void;
   executeTurn: (playerMove: Move) => Promise<void>;
   switchPokemon: (index: number) => void;
-  // Sửa: Hàm này nhận thêm tham số move tùy chọn để ép buộc dùng chiêu đã lock
   performEnemyTurn: (lockedMove?: Move) => Promise<void>; 
 }
 
@@ -27,7 +38,6 @@ const getEffectivenessText = (effectiveness: number, pokemonName: string) => {
   return null;
 };
 
-// AI Logic: Chọn chiêu mạnh nhất dựa trên Pokemon đang đối mặt
 const getSmartEnemyMove = (attacker: BattlePokemon, defender: BattlePokemon): Move => {
   let bestMove = attacker.moves[0];
   let maxDamage = -1;
@@ -56,50 +66,44 @@ export const useBattleStore = create<BattleState>((set, get) => ({
   winner: null,
   mustSwitch: false,
   attackingSide: null,
+  battleBackground: null, // Mặc định
 
   setupBattle: (myTeam, enemyTeam) => {
     if (!myTeam || myTeam.length === 0 || !enemyTeam || enemyTeam.length === 0) return;
+    
+    // --- CHỌN NGẪU NHIÊN 1 LẦN DUY NHẤT KHI BẮT ĐẦU TRẬN ---
+    const randomBg = ARENA_BACKGROUNDS[Math.floor(Math.random() * ARENA_BACKGROUNDS.length)];
+
     set({
       myTeam, enemyTeam, activePlayerIndex: 0, activeEnemyIndex: 0,
       logs: [`Battle Start! Go ${myTeam[0].name}!`],
-      winner: null, isPlayerTurn: true, mustSwitch: false, attackingSide: null
+      winner: null, isPlayerTurn: true, mustSwitch: false, attackingSide: null,
+      battleBackground: randomBg // Lưu vào Store
     });
   },
 
-  // --- LOGIC SWITCH POKEMON (SỬA ĐỔI QUAN TRỌNG) ---
   switchPokemon: (index) => {
     const { myTeam, enemyTeam, activePlayerIndex, activeEnemyIndex, mustSwitch } = get();
     if (myTeam[index].currentHp === 0 || index === activePlayerIndex) return;
 
-    // 1. Nếu là đổi chủ động (Manual Switch), AI phải chọn chiêu NGAY BÂY GIỜ
-    // Dựa trên Pokemon CŨ (activePlayerIndex hiện tại)
     let lockedEnemyMove: Move | undefined = undefined;
     
     if (!mustSwitch) {
         const currentEnemy = enemyTeam[activeEnemyIndex];
-        const currentPlayerOld = myTeam[activePlayerIndex]; // Pokemon sắp bị rút về
-        // AI tính toán dựa trên con cũ
+        const currentPlayerOld = myTeam[activePlayerIndex];
         lockedEnemyMove = getSmartEnemyMove(currentEnemy, currentPlayerOld);
-        
-        // Log debug để bạn kiểm tra (F12)
-        console.log(`AI locked move: ${lockedEnemyMove.name} against ${currentPlayerOld.name}`);
     }
 
-    // 2. Thực hiện đổi Pokemon (Cập nhật State)
     set((state) => ({
       activePlayerIndex: index,
       mustSwitch: false,
       logs: [...state.logs, `Go! ${state.myTeam[index].name}!`]
     }));
     
-    // 3. Xử lý lượt tiếp theo
     if (mustSwitch) {
-        // Nếu đổi do chết -> New Turn -> Player được chọn chiêu
         set({ isPlayerTurn: true });
     } else {
-        // Nếu đổi chủ động -> Mất lượt -> Enemy đánh
         set({ isPlayerTurn: false });
-        // Truyền chiêu đã lock vào để AI dùng đúng chiêu đó lên con mới
         setTimeout(() => get().performEnemyTurn(lockedEnemyMove), 1000); 
     }
   },
@@ -110,13 +114,10 @@ export const useBattleStore = create<BattleState>((set, get) => ({
 
     const playerMon = state.myTeam[state.activePlayerIndex];
     const enemyMon = state.enemyTeam[state.activeEnemyIndex];
-
-    // AI chọn chiêu ngay đầu lượt
     const enemyMove = getSmartEnemyMove(enemyMon, playerMon);
 
     set({ isPlayerTurn: false });
 
-    // Speed Check
     let playerGoesFirst = true;
     if (playerMon.stats.speed > enemyMon.stats.speed) {
         playerGoesFirst = true;
@@ -126,7 +127,6 @@ export const useBattleStore = create<BattleState>((set, get) => ({
         playerGoesFirst = Math.random() < 0.5;
     }
 
-    // --- PERFORM ATTACK FUNCTION ---
     const performAttack = async (
         attacker: BattlePokemon, 
         defender: BattlePokemon, 
@@ -204,22 +204,17 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     }
   },
 
-  // --- ENEMY TURN (Sửa đổi: Nhận lockedMove) ---
   performEnemyTurn: async (lockedMove?: Move) => {
     const state = get();
     if (state.winner) return;
     
     const playerMon = state.myTeam[state.activePlayerIndex];
     const enemyMon = state.enemyTeam[state.activeEnemyIndex];
-
-    // ƯU TIÊN 1: Dùng chiêu đã lock (nếu có)
-    // ƯU TIÊN 2: Nếu không có lock (VD: đầu trận?), AI tự tính
     const enemyMove = lockedMove || getSmartEnemyMove(enemyMon, playerMon);
 
     set({ attackingSide: 'enemy' });
     await new Promise(r => setTimeout(r, 300));
 
-    // Tính Damage lên Pokemon HIỆN TẠI (Pokemon mới ra sân)
     const { damage, effectiveness, isCritical } = calculateDamage(enemyMon, playerMon, enemyMove);
     const newPlayerHp = Math.max(0, playerMon.currentHp - damage);
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast"; // Thư viện thông báo
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Navbar } from "@/components/layout/Navbar";
+import BackgroundMusic from "@/components/layout/BackgroundMusic";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,6 +33,7 @@ export default function RootLayout({
           <Toaster position="bottom-right" toastOptions={{
              style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
           }}/>
+          <BackgroundMusic />
         </AuthProvider>
       </body>
     </html>
