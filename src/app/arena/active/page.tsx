@@ -202,10 +202,35 @@ export default function BattlePage() {
                     <button key={idx} onClick={() => executeTurn(move)} disabled={!isPlayerTurn} className="bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-blue-400 rounded-lg px-3 py-2 disabled:opacity-50 transition-all group relative overflow-hidden">
                       <div className="flex justify-between items-center w-full h-full">
                         <div className="flex flex-col items-start gap-1">
-                          <span className="font-bold text-white capitalize text-sm group-hover:text-blue-300 truncate max-w-[100px] md:max-w-[140px] text-left leading-tight">{move.name.replace(/-/g, " ")}</span>
-                          <div className="text-[10px] text-slate-400 font-mono flex gap-2"><span title="Power">PWR: <b className="text-slate-200">{move.power || '-'}</b></span><span className="text-slate-600">|</span><span title="Accuracy">ACC: <b className="text-slate-200">{move.accuracy || '-'}%</b></span></div>
+                          <span className="font-bold text-white capitalize text-sm group-hover:text-blue-300 truncate max-w-[100px] md:max-w-[140px] text-left leading-tight">
+                            {move.name.replace(/-/g, " ")}
+                          </span>
+
+                          {/* Hàng hiển thị Power | Accuracy | Priority */}
+                          <div className="text-[10px] text-slate-400 font-mono flex gap-2 items-center">
+                            <span title="Power">PWR: <b className="text-slate-200">{move.power || '-'}</b></span>
+                            <span className="text-slate-600">|</span>
+                            <span title="Accuracy">ACC: <b className="text-slate-200">{move.accuracy || '-'}%</b></span>
+
+                            {/* --- HIỂN THỊ ĐỘ ƯU TIÊN (PRIORITY) --- */}
+                            {(move.priority !== 0 && move.priority !== undefined) && (
+                              <>
+                                <span className="text-slate-600">|</span>
+                                <span
+                                  title="Priority"
+                                  className={`font-bold px-1 rounded text-[9px] ${move.priority > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                                >
+                                  {move.priority > 0 ? `+${move.priority}` : move.priority}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1.5 pl-2 shrink-0"><TypeBadge type={move.type} className="text-[9px] px-1.5 py-0.5 shadow-sm" /><CategoryBadge category={move.category} /></div>
+
+                        <div className="flex flex-col items-end gap-1.5 pl-2 shrink-0">
+                          <TypeBadge type={move.type} className="text-[9px] px-1.5 py-0.5 shadow-sm" />
+                          <CategoryBadge category={move.category} />
+                        </div>
                       </div>
                     </button>
                   ))}
