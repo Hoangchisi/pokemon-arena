@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useBattleStore } from "@/hooks/useBattleStore";
 import { Music, Volume2 } from "lucide-react";
 
 export default function BackgroundMusic() {
   const pathname = usePathname();
   const audioRef = useRef<HTMLAudioElement>(null);
+  
+  // Lắng nghe state currentMusic từ battle store
+  const currentMusic = useBattleStore((state) => state.currentMusic);
   
   // Mặc định volume nhỏ (20%)
   const [volume, setVolume] = useState(0.2);
@@ -47,7 +51,34 @@ export default function BackgroundMusic() {
     };
   }, []);
 
-  // 2. LOGIC ĐỔI BÀI KHI CHUYỂN TRANG
+  // 3. LOGIC RESET MUSIC KHI RỜI KHỎI TRANG CHIẾN ĐẤU
+  useEffect(() => {
+    const { setMusicTrack } = useBattleStore.getState();
+    
+    // Nếu không còn ở /arena/active, reset music về null
+    if (!pathname.includes("/arena/active")) {
+      setMusicTrack(null);
+    }
+  }, [pathname]);
+
+  // 4. LOGIC NGHE THAY ĐỔI currentMusic TỪ BATTLE STORE
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Nếu currentMusic được set (khi transformation), đổi sang metrics.mp3
+    if (currentMusic) {
+      audio.src = currentMusic;
+      audio.load();
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => console.log("Music switch waiting for interaction..."));
+      }
+    }
+  }, [currentMusic]);
+
+  // 5. LOGIC ĐỔI BÀI KHI CHUYỂN TRANG
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -55,8 +86,8 @@ export default function BackgroundMusic() {
     const targetSource = getTargetSource(pathname);
     const currentSrc = audio.src; // Full URL
 
-    // Nếu nguồn nhạc thay đổi (Lobby <-> Battle)
-    if (!currentSrc.includes(targetSource)) {
+    // Nếu nguồn nhạc thay đổi (Lobby <-> Battle) và không có custom music
+    if (!currentMusic && !currentSrc.includes(targetSource)) {
       audio.src = targetSource;
       audio.load(); // Bắt buộc load lại
       
@@ -66,9 +97,9 @@ export default function BackgroundMusic() {
           playPromise.catch((e) => console.log("Auto-switch waiting for interaction..."));
       }
     }
-  }, [pathname]);
+  }, [pathname, currentMusic]);
 
-  // 3. LOGIC VOLUME
+  // 6. LOGIC VOLUME
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
@@ -83,8 +114,8 @@ export default function BackgroundMusic() {
       <audio ref={audioRef} src="/music/lobby.mp3" loop />
 
       {/* Icon Loa (Chỉ để trang trí) */}
-      <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-green-400">
-        <Volume2 size={16} className={pathname.includes("active") ? "animate-pulse" : ""} />
+      <div className={`w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center ${pathname.includes("active") || currentMusic ? "text-green-400" : "text-slate-500"}`}>
+        <Volume2 size={16} className={pathname.includes("active") || currentMusic ? "animate-pulse" : ""} />
       </div>
 
       {/* Thanh chỉnh Volume (Luôn hiện hoặc hiện khi hover tùy ý thích) */}

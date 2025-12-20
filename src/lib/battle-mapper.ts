@@ -79,6 +79,7 @@ export const mapToBattlePokemon = async (
     sprite: source.sprite || source.spriteUrl, // Handle naming khác nhau giữa các nguồn
     backSprite: source.sprite || source.spriteUrl, // API thường chỉ có front, tạm dùng front cho back
     level: 50,
+    selectedTeraType: source.teraType || source.types[0],
     
     // Setup Stats ban đầu
     currentHp: source.stats?.hp || source.hp, // Handle naming stats

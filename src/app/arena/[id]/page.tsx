@@ -46,7 +46,7 @@ export default function BattlePage() {
 
         {/* PLAYER SPRITE (Back view) */}
         <div className="absolute bottom-10 left-32">
-           <img src={playerPokemon.backSprite || playerPokemon.sprite} className="w-64 h-64 pixelated object-contain" />
+           <img src={playerPokemon.backSprite || playerPokemon.sprite} className="w-64 h-64 pixelated object-contain" style={{ transform: 'scaleX(-1)' }} />
         </div>
 
         {/* PLAYER HUD (Bottom Right) */}

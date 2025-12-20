@@ -6,15 +6,19 @@ import { useBattleStore } from "@/hooks/useBattleStore";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
-import { RefreshCw, RotateCcw, ArrowLeftRight, X, Zap, Shield, Sword, Activity } from "lucide-react";
+import { MetricsModal } from "@/components/battle/MetricsModal";
+import { RefreshCw, RotateCcw, ArrowLeftRight, X, Zap, Shield, Sword, Activity, Sparkles , Crown} from "lucide-react";
+import { Move } from "@/types/battle";
 
 export default function BattlePage() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
+  const [showMetricsModal, setShowMetricsModal] = useState(false);
 
   const [hoveredSide, setHoveredSide] = useState<'player' | 'enemy' | null>(null);
   const [hoveredSwitchIdx, setHoveredSwitchIdx] = useState<number | null>(null);
+  const [pendingTransformation, setPendingTransformation] = useState<'mega' | 'gmax' | 'tera' | null>(null);
 
   const {
     myTeam,
@@ -29,12 +33,14 @@ export default function BattlePage() {
     executeTurn,
     battleBackground,
     attackingSide,
-    switchPokemon
+    switchPokemon,
+    applyTransformation,
+    playerUsedMechanics,
+    applyTerastallize,
   } = useBattleStore();
 
   useEffect(() => {
     setIsMounted(true);
-    // Không cần setBattleBg ở đây nữa vì đã có trong Store khi gọi setupBattle
     if (!myTeam || myTeam.length === 0) router.push("/arena");
   }, [myTeam, router]);
 
@@ -44,6 +50,13 @@ export default function BattlePage() {
   const enemyPokemon = enemyTeam && enemyTeam.length > 0 ? enemyTeam[activeEnemyIndex] : null;
 
   if (!playerPokemon || !enemyPokemon) return <div className="text-white text-center mt-10">Loading Battle...</div>;
+  const handleMoveSelect = (move: Move) => {
+    // Gửi cả Move và Lựa chọn biến hình vào Store
+    executeTurn(move, pendingTransformation);
+
+    // Reset lựa chọn sau khi gửi xong
+    setPendingTransformation(null);
+  };
 
   const handleSwitch = (index: number) => {
     switchPokemon(index);
@@ -94,13 +107,38 @@ export default function BattlePage() {
     </div>
   );
 
+  // Determine the target Tera Type. 
+  // It prefers the 'selectedTeraType' set in the builder, otherwise defaults to the first type or logic handled in the store.
+  // In the updated MetricsModal logic, the modal determines the display type, 
+  // but here we just need to trigger the action. Ideally, applyTerastallize in store handles the type logic if not passed.
+  // However, based on your previous 'applyTerastallize' signature which took (side, type), 
+  // we might need to pass the type here if the store function expects it.
+  // Assuming 'applyTerastallize' in store can handle just (side) or we pass the pre-selected type from pokemon data.
+  const handleTerastallize = () => {
+    // Use the selected tera type if available, otherwise default to first type
+    const targetType = playerPokemon.selectedTeraType || playerPokemon.types[0];
+    applyTerastallize('player', targetType);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-2 overflow-hidden">
+      {/* Metrics Modal */}
+      <MetricsModal
+        isOpen={showMetricsModal}
+        onClose={() => setShowMetricsModal(false)}
+        pokemon={playerPokemon}
+
+        // Truyền State và Handler vào Modal
+        selectedOption={pendingTransformation}
+        onSelectOption={setPendingTransformation}
+
+        isPlayerTurn={isPlayerTurn}
+        usedMechanics={playerUsedMechanics}
+      />
 
       <div className="max-w-6xl w-full h-[90vh] flex flex-col gap-4 scale-[0.9] origin-center">
 
         {/* === BATTLE SCREEN === */}
-        {/* Sử dụng battleBackground lấy từ Store */}
         <div
           className="flex-grow rounded-2xl border border-slate-700 relative overflow-visible shadow-2xl flex flex-col z-10 bg-slate-900 bg-cover bg-center bg-no-repeat transition-all duration-1000"
           style={{
@@ -121,6 +159,9 @@ export default function BattlePage() {
                 <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-grow">
                   <span className="font-bold text-lg capitalize truncate text-white drop-shadow-md block">{playerPokemon.name}</span>
                   <div className="flex gap-1 shrink-0">{playerPokemon.types.map((t: string) => (<TypeBadge key={t} type={t} className="text-[9px] px-1.5 py-0.5 shadow-sm min-w-[32px] justify-center">{t.slice(0, 3)}</TypeBadge>))}</div>
+                  {playerPokemon.terastallize?.isTerastallized && (
+                    <span className="text-[7px] px-1 py-0.5 bg-cyan-500/20 text-cyan-300 rounded font-bold border border-cyan-500 shrink-0">TERA</span>
+                  )}
                 </div>
                 <span className="text-xs text-slate-400 font-mono shrink-0 ml-2">Lv.50</span>
               </div>
@@ -134,6 +175,9 @@ export default function BattlePage() {
                 <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-grow">
                   <span className="font-bold text-lg capitalize truncate text-white drop-shadow-md block">{enemyPokemon.name}</span>
                   <div className="flex gap-1 shrink-0">{enemyPokemon.types.map((t: string) => (<TypeBadge key={t} type={t} className="text-[9px] px-1.5 py-0.5 shadow-sm min-w-[32px] justify-center">{t.slice(0, 3)}</TypeBadge>))}</div>
+                  {enemyPokemon.terastallize?.isTerastallized && (
+                    <span className="text-[7px] px-1 py-0.5 bg-cyan-500/20 text-cyan-300 rounded font-bold border border-cyan-500 shrink-0">TERA</span>
+                  )}
                 </div>
                 <span className="text-xs text-slate-400 font-mono shrink-0 ml-2">Lv.50</span>
               </div>
@@ -147,14 +191,35 @@ export default function BattlePage() {
             {/* PLAYER SPRITE */}
             <div className="relative group cursor-help" onMouseEnter={() => setHoveredSide('player')} onMouseLeave={() => setHoveredSide(null)}>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48 h-12 bg-black/60 blur-xl rounded-[100%]"></div>
-              <img src={playerPokemon.backSprite || playerPokemon.sprite} alt={playerPokemon.name} className={`w-48 h-48 md:w-64 md:h-64 pixelated object-contain drop-shadow-2xl transition-transform duration-300 ease-out ${playerPokemon.currentHp === 0 ? 'opacity-0 translate-y-10 grayscale blur-sm' : ''} ${attackingSide === 'player' ? 'translate-x-20 -translate-y-4 scale-110' : ''} ${attackingSide === 'enemy' ? 'animate-pulse' : ''}`} />
-              {hoveredSide === 'player' && <PokemonStatsTooltip pokemon={playerPokemon} side="left" />}
+              <img
+                src={playerPokemon.backSprite || playerPokemon.sprite}
+                alt={playerPokemon.name}
+                className={`
+                    w-48 h-48 md:w-64 md:h-64 pixelated object-contain drop-shadow-2xl 
+                    transition-transform duration-300 ease-out 
+                    ${playerPokemon.currentHp === 0 ? 'opacity-0 translate-y-10 grayscale blur-sm' : ''}
+                    ${attackingSide === 'enemy' ? 'animate-pulse' : ''}
+                  `}
+                style={{
+                  transform: `scaleX(-1) ${attackingSide === 'player' ? 'translateX(-80px) translateY(16px) scale(1.1)' : 'scale(1)'}`
+                }}
+              />{hoveredSide === 'player' && <PokemonStatsTooltip pokemon={playerPokemon} side="left" />}
             </div>
 
             {/* ENEMY SPRITE */}
             <div className="relative group cursor-help" onMouseEnter={() => setHoveredSide('enemy')} onMouseLeave={() => setHoveredSide(null)}>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48 h-12 bg-black/60 blur-xl rounded-[100%]"></div>
-              <img src={enemyPokemon.sprite} alt={enemyPokemon.name} className={`w-40 h-40 md:w-56 md:h-56 pixelated object-contain drop-shadow-2xl transition-transform duration-300 ease-out ${enemyPokemon.currentHp === 0 ? 'opacity-0 translate-y-10 grayscale blur-sm' : ''} ${attackingSide === 'enemy' ? '-translate-x-20 translate-y-4 scale-110' : ''} ${attackingSide === 'player' ? 'animate-pulse' : ''}`} />
+              <img
+                src={enemyPokemon.sprite}
+                alt={enemyPokemon.name}
+                className={`
+                    w-40 h-40 md:w-56 md:h-56 pixelated object-contain drop-shadow-2xl 
+                    transition-transform duration-300 ease-out
+                    ${enemyPokemon.currentHp === 0 ? 'opacity-0 translate-y-10 grayscale blur-sm' : ''}
+                    ${attackingSide === 'enemy' ? '-translate-x-20 translate-y-4 scale-110' : ''}
+                    ${attackingSide === 'player' ? 'animate-pulse' : ''}
+                  `}
+              />
               {hoveredSide === 'enemy' && <PokemonStatsTooltip pokemon={enemyPokemon} side="right" />}
             </div>
           </div>
@@ -199,20 +264,22 @@ export default function BattlePage() {
               <div className="flex flex-col h-full gap-2">
                 <div className="grid grid-cols-2 gap-3 flex-grow">
                   {playerPokemon.moves.map((move, idx) => (
-                    <button key={idx} onClick={() => executeTurn(move)} disabled={!isPlayerTurn} className="bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-blue-400 rounded-lg px-3 py-2 disabled:opacity-50 transition-all group relative overflow-hidden">
+                    <button key={idx} onClick={() => handleMoveSelect(move)} disabled={!isPlayerTurn} className="bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-blue-400 rounded-lg px-3 py-2 disabled:opacity-50 transition-all group relative overflow-hidden">
                       <div className="flex justify-between items-center w-full h-full">
                         <div className="flex flex-col items-start gap-1">
                           <span className="font-bold text-white capitalize text-sm group-hover:text-blue-300 truncate max-w-[100px] md:max-w-[140px] text-left leading-tight">
                             {move.name.replace(/-/g, " ")}
                           </span>
 
-                          {/* Hàng hiển thị Power | Accuracy | Priority */}
                           <div className="text-[10px] text-slate-400 font-mono flex gap-2 items-center">
-                            <span title="Power">PWR: <b className="text-slate-200">{move.power || '-'}</b></span>
+                            <span title="Power">PWR: <b className="text-slate-200">{move.power || '-'}</b>
+                              {playerPokemon.transformation?.form === 'gmax' && move.power > 0 && (
+                                <span className="text-[8px] text-purple-400 ml-1" title="Power increased by 30% (Gigantamax)">↑30%</span>
+                              )}
+                            </span>
                             <span className="text-slate-600">|</span>
                             <span title="Accuracy">ACC: <b className="text-slate-200">{move.accuracy || '-'}%</b></span>
 
-                            {/* --- HIỂN THỊ ĐỘ ƯU TIÊN (PRIORITY) --- */}
                             {(move.priority !== 0 && move.priority !== undefined) && (
                               <>
                                 <span className="text-slate-600">|</span>
@@ -235,7 +302,28 @@ export default function BattlePage() {
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setShowSwitchMenu(true)} disabled={!isPlayerTurn} className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md"><ArrowLeftRight size={18} /> Switch Pokemon (Cost: 1 Turn)</button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setShowMetricsModal(true)}
+                    disabled={!isPlayerTurn}
+                    className={`bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md ${pendingTransformation ? 'ring-2 ring-yellow-400 bg-indigo-700' : ''} `}// Highlight nếu đang có lựa chọn`}
+                  >
+                    {pendingTransformation === 'mega' && <Crown size={18} className="text-yellow-400 animate-pulse" />}
+                    {pendingTransformation === 'gmax' && <Zap size={18} className="text-red-400 animate-pulse" />}
+                    {pendingTransformation === 'tera' && <Sparkles size={18} className="text-cyan-400 animate-pulse" />}
+
+                    {!pendingTransformation && <Sparkles size={18} />}
+
+                    <span>{pendingTransformation ? pendingTransformation.toUpperCase() : 'Metrics'}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowSwitchMenu(true)}
+                    disabled={!isPlayerTurn}
+                    className="bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md"
+                  >
+                    <ArrowLeftRight size={18} /> Switch
+                  </button>
+                </div>
               </div>
             )}
             {!isPlayerTurn && !winner && !mustSwitch && (

@@ -99,6 +99,7 @@ model PokemonBuild {
   // Info
   types       String[] // Lưu mảng string (VD: ["fire", "flying"])
   spriteUrl   String?
+  teraType    String?  // Loại Tera được chọn (VD: "fire", "water")
   
   order       Int      // Vị trí trong team (0-5)
 }

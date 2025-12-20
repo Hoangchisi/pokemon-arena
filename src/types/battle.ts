@@ -28,6 +28,24 @@ export interface BattleStats {
   evasionModifier?: number;
 }
 
+// Định nghĩa Transformation State cho Pokemon
+export interface TransformationState {
+  form: 'normal' | 'mega' | 'gmax';
+  gmaxTurnsLeft?: number;      // Số lượt còn lại của Gmax (0 nếu không phải Gmax)
+  originalStats?: BattleStats; // Backup Stats để revert từ Mega/Gmax
+  originalName?: string;       // Backup Name để revert từ Mega/Gmax     
+  originalSprite?: string;
+  originalBackSprite?: string;
+  originalMoves?: Move[];
+}
+
+// Định nghĩa Terastallize State
+export interface TerastallizeState {
+  isTerastallized: boolean;
+  teraType: string | null;     // Hệ được chọn cho Terastallize
+  originalTypes?: string[];    // Backup types gốc
+}
+
 // Định nghĩa Pokemon khi đang tham gia trận đấu (Dynamic State)
 export interface BattlePokemon {
   // --- Thông tin tĩnh (Từ DB/API) ---
@@ -53,7 +71,18 @@ export interface BattlePokemon {
   status?: 'burn' | 'freeze' | 'paralyze' | 'poison' | 'sleep' | null;
   
   // Có đang bị choáng/mất lượt không?
-  isFlinched?: boolean; 
+  isFlinched?: boolean;
+  
+  // --- TRANSFORMATION STATE (Mega/Gmax) ---
+  transformation?: TransformationState;
+
+  // --- TERASTALLIZE STATE ---
+  terastallize?: TerastallizeState;
+  
+  // --- TERASTALLIZE CONFIG (Chọn hệ Tera khi build team) ---
+  selectedTeraType?: string | null; // Hệ được chọn cho Terastallize (set khi build team)
+
+  hasUsedMechanic?: boolean; // Đã sử dụng Transformation hoặc Terastallize trong trận chưa
 }
 
 // (Optional) Định nghĩa kết quả của một lượt tính toán damage

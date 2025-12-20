@@ -41,6 +41,16 @@ const config: Config = {
           dark: '#705746',
         }
       },
+      keyframes: {
+        playerAttack: {
+          '0%': { transform: 'scaleX(-1)' },
+          '50%': { transform: 'scaleX(-1) translateX(-30px) translateY(-8px) scale(1.15)' },
+          '100%': { transform: 'scaleX(-1)' },
+        }
+      },
+      animation: {
+        'player-attack': 'playerAttack 0.6s ease-in-out',
+      }
     },
   },
   plugins: [],

@@ -65,6 +65,7 @@ export async function PUT(
               speed: p.speed || p.stats.speed,
               types: p.types,
               spriteUrl: p.spriteUrl || p.sprite,
+              teraType: p.teraType || null,
               order: index
             };
           })

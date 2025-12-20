@@ -23,6 +23,7 @@ const createTeamSchema = z.object({
     speed: z.number(),
     types: z.array(z.string()),
     spriteUrl: z.string().nullable(),
+    teraType: z.string().nullable(),
     order: z.number()
   })).max(6, "Maximum 6 Pokemons allowed")
 });
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
             speed: p.speed,
             types: p.types,
             spriteUrl: p.spriteUrl,
+            teraType: p.teraType,
             order: p.order
           }))
         }

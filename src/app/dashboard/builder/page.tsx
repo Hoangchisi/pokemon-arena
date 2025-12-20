@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-hot-toast";
 import {
-  Save, Trash2, Plus, LayoutList, ChevronDown, DownloadCloud, Loader2, Search, X, Zap
+  Save, Trash2, Plus, LayoutList, ChevronDown, DownloadCloud, Loader2, Search, X, Zap, Sparkles
 } from "lucide-react";
 import { getPokemonDetails, searchPokemonList } from "@/lib/pokeapi";
+import { getPokemonByName } from "@/lib/pokemon-forms";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
 import { TeamMember } from "@/types/pokemon";
 import { TypeBadge } from "@/components/ui/TypeBadge";
@@ -42,6 +43,13 @@ const TYPE_COLORS: Record<string, string> = {
   rock: "bg-stone-500", ghost: "bg-violet-700", dragon: "bg-indigo-600",
   steel: "bg-slate-400", dark: "bg-neutral-800", fairy: "bg-pink-400",
 };
+
+// --- DANH SÁCH CÁC HỆ LOẠI ---
+const ALL_TYPES = [
+  'normal', 'fire', 'water', 'electric', 'grass', 'ice', 'fighting', 'poison',
+  'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark',
+  'steel', 'fairy'
+];
 
 export default function TeamBuilderPage() {
   // --- STATES ---
@@ -95,7 +103,8 @@ export default function TeamBuilderPage() {
         spAtk: p.spAtk, spDef: p.spDef, speed: p.stats?.speed || p.speed
       },
       moves: [],
-      selectedMoves: [p.move1, p.move2, p.move3, p.move4].filter(Boolean)
+      selectedMoves: [p.move1, p.move2, p.move3, p.move4].filter(Boolean),
+      selectedTeraType: p.teraType || null,
     }));
 
     setTeam(mappedPokemons);
@@ -105,6 +114,19 @@ export default function TeamBuilderPage() {
   // 3. Tải danh sách Move (nếu load từ DB chưa có)
   const refreshMemberData = async (uuid: string, name: string) => {
     toast.loading(`Fetching moves for ${name}...`, { id: "loading-moves" });
+
+    // Ưu tiên dữ liệu local - nhưng chỉ nếu có moves data
+    const localData = getPokemonByName(name);
+    if (localData && localData.moves && localData.moves.length > 0) {
+      setTeam(prev => prev.map(member => {
+        if (member.uuid !== uuid) return member;
+        return { ...member, moves: localData.moves, stats: localData.stats };
+      }));
+      toast.success("Moves loaded!", { id: "loading-moves" });
+      return;
+    }
+
+    // Fallback: gọi PokeAPI để lấy moves
     const data = await getPokemonDetails(name);
     if (data) {
       setTeam(prev => prev.map(member => {
@@ -171,6 +193,7 @@ export default function TeamBuilderPage() {
         types: p.types, spriteUrl: p.sprite, order: index,
         move1: p.selectedMoves[0], move2: p.selectedMoves[1],
         move3: p.selectedMoves[2], move4: p.selectedMoves[3],
+        teraType: p.selectedTeraType || null,
       }))
     };
 
@@ -205,17 +228,39 @@ export default function TeamBuilderPage() {
     e.preventDefault();
     if (!modalQuery.trim()) return;
     setIsSearching(true);
+
+    // Gọi hàm tìm kiếm từ API
     const results = await searchPokemonList(modalQuery);
-    setModalResults(results);
+
+    // LỌC BỎ CÁC DẠNG MEGA VÀ GMAX
+    const filteredResults = results.filter((p: any) => {
+      const name = p.name.toLowerCase();
+      // Loại bỏ nếu tên chứa "mega" hoặc "gmax" (hoặc "gigantamax")
+      return !name.includes("mega") && !name.includes("gmax") && !name.includes("gigantamax");
+    });
+
+    setModalResults(filteredResults);
     setIsSearching(false);
   };
 
   const selectPokemonFromModal = async (pokemonName: string) => {
     setIsSearching(true);
+
+    // Ưu tiên dữ liệu local - nhưng chỉ nếu có moves data
+    const localData = getPokemonByName(pokemonName);
+    if (localData && localData.moves && localData.moves.length > 0) {
+      setTeam([...team, { ...localData, selectedMoves: [], selectedTeraType: null, uuid: uuidv4() }]);
+      toast.success(`Added ${localData.name}!`);
+      setIsModalOpen(false);
+      setIsSearching(false);
+      return;
+    }
+
+    // Fallback: gọi PokeAPI để lấy moves
     const fullData = await getPokemonDetails(pokemonName);
 
     if (fullData) {
-      setTeam([...team, { ...fullData, selectedMoves: [], uuid: uuidv4() }]);
+      setTeam([...team, { ...fullData, selectedMoves: [], selectedTeraType: null, uuid: uuidv4() }]);
       toast.success(`Added ${fullData.name}!`);
       setIsModalOpen(false);
     } else {
@@ -351,6 +396,43 @@ export default function TeamBuilderPage() {
                     </h3>
                     <div className="flex gap-1 justify-center flex-wrap">
                       {member.types.map(t => <TypeBadge key={t} type={t} className="text-[10px] px-2 py-0.5 shadow-lg" />)}
+                    </div>
+
+                    {/* Terastallize Selector */}
+                    <div className="mt-2 pt-2 border-t border-white/10 w-full">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Sparkles size={12} className="text-cyan-400" />
+                        <span className="text-[9px] font-bold text-cyan-300">TERA TYPE:</span>
+                      </div>
+                      <div className="relative group">
+                        <button className="w-full bg-cyan-900/30 border border-cyan-600/50 hover:border-cyan-500 rounded-lg px-2 py-1 text-[11px] font-bold text-cyan-300 flex items-center justify-between transition-all">
+                          <span>{member.selectedTeraType ? member.selectedTeraType.toUpperCase() : 'Select'}</span>
+                          <ChevronDown size={12} />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 hidden group-hover:grid grid-cols-3 gap-1 p-2 w-48">
+                          {ALL_TYPES.map((type) => (
+                            <button
+                              key={type}
+                              onClick={() => {
+                                setTeam(team.map(m =>
+                                  m.uuid === member.uuid ? { ...m, selectedTeraType: type } : m
+                                ));
+                              }}
+                              className={`py-1 px-1.5 rounded text-[10px] font-bold border transition-all ${member.selectedTeraType === type
+                                  ? `border-cyan-500 bg-cyan-500/30 text-cyan-300`
+                                  : `border-slate-600 bg-slate-700/30 text-slate-300 hover:border-cyan-600`
+                                }`}
+                            >
+
+                              <TypeBadge type={type} className="text-[10px] px-1 py-0.5 w-full justify-center">
+                                {type.slice(0, 3)}
+                              </TypeBadge>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 

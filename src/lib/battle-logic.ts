@@ -1,5 +1,6 @@
 // src/lib/battle-logic.ts
-import { BattlePokemon, Move } from "@/types/battle";
+import { BattlePokemon, Move, BattleStats } from "@/types/battle";
+import { getPokemonByName, getMegaForm, getGmaxForm } from "@/lib/pokemon-forms";
 
 // 1. Định nghĩa Bảng Khắc Hệ (Defender Type làm Key)
 // 0: Vô hiệu (No Effect)
@@ -86,4 +87,210 @@ export const calculateDamage = (
   damage = Math.floor(damage * effectiveness);
 
   return { damage, isCritical, effectiveness };
+};
+
+/**
+ * Xử lý Mega Evolution
+ * - Thay đổi Sprite (dùng name + "-mega" pattern)
+ * - Tăng Stats (Base Stats tăng ~20-40%)
+ * - Hiệu lực: Vĩnh viễn
+ */
+export const handleMegaEvolution = (pokemon: BattlePokemon): BattlePokemon => {
+  if (pokemon.transformation?.form === 'mega') {
+    return pokemon; // Đã là Mega rồi
+  }
+
+  const megaStatMultiplier = 1.3; // Tăng 30% Stats
+
+  const newStats: BattleStats = {
+    hp: pokemon.stats.hp, // HP không tăng
+    attack: Math.floor(pokemon.stats.attack * megaStatMultiplier),
+    defense: Math.floor(pokemon.stats.defense * megaStatMultiplier),
+    spAtk: Math.floor(pokemon.stats.spAtk * megaStatMultiplier),
+    spDef: Math.floor(pokemon.stats.spDef * megaStatMultiplier),
+    speed: Math.floor(pokemon.stats.speed * megaStatMultiplier),
+  };
+
+  // Lấy sprite từ pokedex data
+  const pokemonData = getPokemonByName(pokemon.name);
+  const megaForm = pokemonData?.forms?.mega;
+  const megaSprite = megaForm?.sprite || pokemon.sprite.replace(/\.(png|jpg|gif)$/i, '') + '-mega.png';
+  // Mega backSprite: dùng chính megaSprite (vì backSprite sẽ flip bằng CSS)
+  const megaBackSprite = megaSprite;
+
+  return {
+    ...pokemon,
+    name: megaForm?.name || pokemon.name,
+    sprite: megaSprite,
+    backSprite: megaBackSprite,
+    stats: newStats,
+    transformation: {
+      form: 'mega',
+      gmaxTurnsLeft: 0,
+      originalStats: pokemon.stats, // Backup Stats gốc
+      originalName: pokemon.name, // Backup Name gốc
+    },
+  };
+};
+
+/**
+ * Xử lý Gigantamax
+ * - Thay đổi Sprite (dùng name + "-gmax" pattern)
+ * - Tăng HP (x2)
+ * - Hiệu lực: 3 lượt
+ */
+export const handleGigantamax = (pokemon: BattlePokemon): BattlePokemon => {
+  if (pokemon.transformation?.form === 'gmax') {
+    return pokemon; // Đã là Gmax rồi
+  }
+
+  const gmaxHpMultiplier = 2; // HP tăng gấp đôi
+  const newMaxHp = Math.floor(pokemon.maxHp * gmaxHpMultiplier);
+  const newCurrentHp = Math.floor(pokemon.currentHp * gmaxHpMultiplier);
+
+  // Tăng power của tất cả moves lên 30%
+  const boostedMoves = pokemon.moves.map(move => ({
+    ...move,
+    power: move.power > 0 ? Math.floor(move.power * 1.3) : move.power,
+  }));
+
+  // Lấy sprite từ pokedex data
+  const pokemonData = getPokemonByName(pokemon.name);
+  const gmaxForm = pokemonData?.forms?.gmax;
+  const gmaxSprite = gmaxForm?.sprite || pokemon.sprite.replace(/\.(png|jpg|gif)$/i, '') + '-gmax.png';
+  // Gmax backSprite: dùng chính gmaxSprite (vì backSprite sẽ flip bằng CSS)
+  const gmaxBackSprite = gmaxSprite;
+
+  return {
+    ...pokemon,
+    name: gmaxForm?.name || pokemon.name,
+    sprite: gmaxSprite,
+    backSprite: gmaxBackSprite,
+    maxHp: newMaxHp,
+    currentHp: newCurrentHp,
+    moves: boostedMoves, // Sử dụng moves với power tăng 30%
+    transformation: {
+      form: 'gmax',
+      gmaxTurnsLeft: 3, // Bắt đầu với 3 lượt
+      originalStats: pokemon.stats, // Backup Stats gốc
+      originalName: pokemon.name, // Backup Name gốc
+      originalMoves: pokemon.moves, // Backup Moves gốc để revert sau
+    },
+  };
+};
+
+/**
+ * Revert Gmax về form bình thường
+ * - Quay về Stats gốc
+ * - Quay về Sprite gốc
+ * - Xử lý HP: Giữ tỉ lệ máu khi revert
+ */
+export const revertGigantamax = (pokemon: BattlePokemon): BattlePokemon => {
+  if (pokemon.transformation?.form !== 'gmax' || !pokemon.transformation.originalStats) {
+    return pokemon;
+  }
+
+  const originalStats = pokemon.transformation.originalStats;
+  const originalName = pokemon.transformation.originalName || pokemon.name;
+  const originalMaxHp = originalStats.hp;
+  const originalMoves = (pokemon.transformation as any).originalMoves || pokemon.moves;
+
+  // Giữ tỉ lệ HP: (currentHp / maxHp) * originalMaxHp
+  const hpRatio = pokemon.currentHp / pokemon.maxHp;
+  const newCurrentHp = Math.ceil(originalMaxHp * hpRatio);
+
+  // Lấy sprite gốc từ pokemonData
+  const pokemonData = getPokemonByName(originalName);
+  const originalSprite = pokemonData?.sprite || pokemon.sprite.replace(/-gmax\.(png|jpg|gif)$/i, '.$1');
+  const originalBackSprite = pokemonData?.backSprite || pokemon.backSprite?.replace(/-gmax\.(png|jpg|gif)$/i, '.$1');
+
+  return {
+    ...pokemon,
+    name: originalName,
+    sprite: originalSprite,
+    backSprite: originalBackSprite,
+    maxHp: originalMaxHp,
+    currentHp: Math.max(1, newCurrentHp), // Luôn giữ ít nhất 1 HP
+    stats: originalStats,
+    moves: originalMoves, // Restore moves gốc
+    transformation: {
+      form: 'normal',
+      gmaxTurnsLeft: 0,
+      originalStats: undefined,
+      originalName: undefined,
+    },
+  };
+};
+
+/**
+ * Xử lý Terastallize
+ * - Đổi types thành teraType được chọn
+ * - Vĩnh viễn cho đến khi trận kết thúc hoặc bị revert
+ */
+export const handleTerastallize = (pokemon: BattlePokemon, teraType: string): BattlePokemon => {
+  if (pokemon.terastallize?.isTerastallized) {
+    return pokemon; // Đã Terastallize rồi
+  }
+
+  return {
+    ...pokemon,
+    types: [teraType], // Đổi types sang hệ Tera
+    terastallize: {
+      isTerastallized: true,
+      teraType: teraType,
+      originalTypes: pokemon.types, // Backup types gốc
+    },
+  };
+};
+
+/**
+ * Revert Terastallize về form bình thường
+ */
+export const revertTerastallize = (pokemon: BattlePokemon): BattlePokemon => {
+  if (!pokemon.terastallize?.isTerastallized || !pokemon.terastallize.originalTypes) {
+    return pokemon;
+  }
+
+  return {
+    ...pokemon,
+    types: pokemon.terastallize.originalTypes,
+    terastallize: {
+      isTerastallized: false,
+      teraType: null,
+      originalTypes: undefined,
+    },
+  };
+};
+
+/**
+ * Kiểm tra kết thúc lượt và xử lý Gmax countdown
+ * - Giảm gmaxTurnsLeft
+ * - Nếu gmaxTurnsLeft == 0 thì revert
+ */
+export const checkTurnEnd = (pokemon: BattlePokemon): BattlePokemon => {
+  if (!pokemon.transformation || pokemon.transformation.form !== 'gmax') {
+    return pokemon;
+  }
+
+  const currentTurns = pokemon.transformation.gmaxTurnsLeft || 0;
+  const newGmaxTurnsLeft = Math.max(0, currentTurns - 1);
+
+  if (newGmaxTurnsLeft === 0) {
+    // Revert Gmax
+    return revertGigantamax({ 
+      ...pokemon, 
+      transformation: { 
+        ...pokemon.transformation, 
+        gmaxTurnsLeft: 0 
+      } 
+    });
+  }
+
+  return {
+    ...pokemon,
+    transformation: {
+      ...pokemon.transformation,
+      gmaxTurnsLeft: newGmaxTurnsLeft,
+    },
+  };
 };
