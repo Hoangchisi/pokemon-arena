@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation"; // Thêm useSearchParams
+import { useEffect, useState, Suspense } from "react"; // 1. Thêm Suspense
+import { useRouter, useSearchParams } from "next/navigation";
 import { useBattleStore } from "@/hooks/useBattleStore";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
 import { MetricsModal } from "@/components/battle/MetricsModal";
-import { RefreshCw, RotateCcw, ArrowLeftRight, X, Zap, Shield, Sword, Activity, Sparkles , Crown} from "lucide-react";
+import { RefreshCw, RotateCcw, ArrowLeftRight, X, Zap, Shield, Sword, Activity, Sparkles, Crown } from "lucide-react";
 import { Move } from "@/types/battle";
-import { STAGE_ORDER } from "@/constants/stages"; // Import thứ tự màn chơi
+import { STAGE_ORDER } from "@/constants/stages";
 import { toast } from "react-hot-toast";
 
-export default function BattlePage() {
+// 2. Đổi tên component chính hiện tại thành BattleContent (hoặc tên khác tùy ý)
+// và KHÔNG export default nó nữa
+function BattleContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams(); // Hook gây ra lỗi nếu thiếu Suspense
 
   const [isMounted, setIsMounted] = useState(false);
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
@@ -24,7 +26,6 @@ export default function BattlePage() {
   const [hoveredSwitchIdx, setHoveredSwitchIdx] = useState<number | null>(null);
   const [pendingTransformation, setPendingTransformation] = useState<'mega' | 'gmax' | 'tera' | null>(null);
   
-  // State để chặn việc gọi API lưu nhiều lần
   const [progressSaved, setProgressSaved] = useState(false);
 
   const {
@@ -36,14 +37,11 @@ export default function BattlePage() {
     isPlayerTurn,
     winner,
     mustSwitch,
-    setupBattle,
     executeTurn,
     battleBackground,
     attackingSide,
     switchPokemon,
-    applyTransformation,
     playerUsedMechanics,
-    applyTerastallize,
   } = useBattleStore();
 
   useEffect(() => {
@@ -57,26 +55,23 @@ export default function BattlePage() {
       const stageKey = searchParams.get('stage'); 
       
       if (stageKey) {
-        setProgressSaved(true); // Lock lại ngay để tránh gọi API nhiều lần
+        setProgressSaved(true); 
         
         // @ts-ignore
         const stageIndex = STAGE_ORDER.indexOf(stageKey);
         
         if (stageIndex !== -1) {
-            console.log(`Victory against ${stageKey} (Current Index: ${stageIndex})`);
+            console.log(`User beat stage: ${stageKey} (Index: ${stageIndex})`);
             
-            // GỌI API ĐỂ LƯU DATABASE
             const saveToDb = async () => {
                 try {
                     const res = await fetch('/api/user/progress', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        // Mở khóa màn tiếp theo (index + 1)
                         body: JSON.stringify({ stageUnlocked: stageIndex + 1 })
                     });
 
                     if (!res.ok) throw new Error("Failed to save");
-                    
                     toast.success("Progress Saved! Next champion unlocked.");
                 } catch (err) {
                     console.error("Save progress error:", err);
@@ -255,7 +250,6 @@ export default function BattlePage() {
 
         {/* === CONTROLS === */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[240px] shrink-0 relative z-50">
-
           <div className="md:col-span-1 bg-slate-900 rounded-xl border border-slate-700 p-4 overflow-y-auto font-mono text-sm text-slate-300 shadow-inner flex flex-col">
             <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 sticky top-0 bg-slate-900 pb-2 border-b border-slate-800">Battle Log</h3>
             <div className="space-y-2 flex-grow">
@@ -298,7 +292,6 @@ export default function BattlePage() {
                           <span className="font-bold text-white capitalize text-sm group-hover:text-blue-300 truncate max-w-[100px] md:max-w-[140px] text-left leading-tight">
                             {move.name.replace(/-/g, " ")}
                           </span>
-
                           <div className="text-[10px] text-slate-400 font-mono flex gap-2 items-center">
                             <span title="Power">PWR: <b className="text-slate-200">{move.power || '-'}</b>
                               {playerPokemon.transformation?.form === 'gmax' && move.power > 0 && (
@@ -307,21 +300,16 @@ export default function BattlePage() {
                             </span>
                             <span className="text-slate-600">|</span>
                             <span title="Accuracy">ACC: <b className="text-slate-200">{move.accuracy || '-'}%</b></span>
-
                             {(move.priority !== 0 && move.priority !== undefined) && (
                               <>
                                 <span className="text-slate-600">|</span>
-                                <span
-                                  title="Priority"
-                                  className={`font-bold px-1 rounded text-[9px] ${move.priority > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
-                                >
+                                <span title="Priority" className={`font-bold px-1 rounded text-[9px] ${move.priority > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                                   {move.priority > 0 ? `+${move.priority}` : move.priority}
                                 </span>
                               </>
                             )}
                           </div>
                         </div>
-
                         <div className="flex flex-col items-end gap-1.5 pl-2 shrink-0">
                           <TypeBadge type={move.type} className="text-[9px] px-1.5 py-0.5 shadow-sm" />
                           <CategoryBadge category={move.category} />
@@ -339,16 +327,10 @@ export default function BattlePage() {
                     {pendingTransformation === 'mega' && <Crown size={18} className="text-yellow-400 animate-pulse" />}
                     {pendingTransformation === 'gmax' && <Zap size={18} className="text-red-400 animate-pulse" />}
                     {pendingTransformation === 'tera' && <Sparkles size={18} className="text-cyan-400 animate-pulse" />}
-
                     {!pendingTransformation && <Sparkles size={18} />}
-
                     <span>{pendingTransformation ? pendingTransformation.toUpperCase() : 'Metrics'}</span>
                   </button>
-                  <button
-                    onClick={() => setShowSwitchMenu(true)}
-                    disabled={!isPlayerTurn}
-                    className="bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md"
-                  >
+                  <button onClick={() => setShowSwitchMenu(true)} disabled={!isPlayerTurn} className="bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md">
                     <ArrowLeftRight size={18} /> Switch
                   </button>
                 </div>
@@ -363,5 +345,21 @@ export default function BattlePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// 3. Component wrapper để bọc Suspense (Đây là component được export default)
+export default function BattlePage() {
+  return (
+    <Suspense fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+            <div className="text-white text-xl font-bold flex gap-3 items-center">
+                 <RefreshCw className="animate-spin text-blue-500" />
+                 Loading Arena...
+            </div>
+        </div>
+    }>
+      <BattleContent />
+    </Suspense>
   );
 }
