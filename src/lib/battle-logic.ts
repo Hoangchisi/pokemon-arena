@@ -92,43 +92,71 @@ export const calculateDamage = (
 /**
  * Xử lý Mega Evolution
  * - Thay đổi Sprite (dùng name + "-mega" pattern)
- * - Tăng Stats (Base Stats tăng ~20-40%)
- * - Hiệu lực: Vĩnh viễn
+ * - Tăng Stats 
+ * - Hiệu lực: đến hết trận đấu
  */
 export const handleMegaEvolution = (pokemon: BattlePokemon): BattlePokemon => {
   if (pokemon.transformation?.form === 'mega') {
     return pokemon; // Đã là Mega rồi
   }
-
-  const megaStatMultiplier = 1.3; // Tăng 30% Stats
-
-  const newStats: BattleStats = {
-    hp: pokemon.stats.hp, // HP không tăng
-    attack: Math.floor(pokemon.stats.attack * megaStatMultiplier),
-    defense: Math.floor(pokemon.stats.defense * megaStatMultiplier),
-    spAtk: Math.floor(pokemon.stats.spAtk * megaStatMultiplier),
-    spDef: Math.floor(pokemon.stats.spDef * megaStatMultiplier),
-    speed: Math.floor(pokemon.stats.speed * megaStatMultiplier),
-  };
-
   // Lấy sprite từ pokedex data
   const pokemonData = getPokemonByName(pokemon.name);
   const megaForm = pokemonData?.forms?.mega;
   const megaSprite = megaForm?.sprite || pokemon.sprite.replace(/\.(png|jpg|gif)$/i, '') + '-mega.png';
-  // Mega backSprite: dùng chính megaSprite (vì backSprite sẽ flip bằng CSS)
+  // Lấy Base Stats gốc (OldBaseStat) từ data
+  const oldBaseStats = pokemonData?.stats || pokemon.stats;
+
+  // 2. Tính toán Stats mới
+  let newStats: BattleStats;
   const megaBackSprite = megaSprite;
+
+
+  if (megaForm?.stats) {
+    const newBaseStats = megaForm.stats;
+
+    // ÁP DỤNG CÔNG THỨC: NewStat = CurrentStat - OldBase + NewBase
+    newStats = {
+      hp: pokemon.stats.hp, // HP luôn giữ nguyên khi Mega
+      attack: Math.max(1, pokemon.stats.attack - oldBaseStats.attack + newBaseStats.attack),
+      defense: Math.max(1, pokemon.stats.defense - oldBaseStats.defense + newBaseStats.defense),
+      spAtk: Math.max(1, pokemon.stats.spAtk - oldBaseStats.spAtk + newBaseStats.spAtk),
+      spDef: Math.max(1, pokemon.stats.spDef - oldBaseStats.spDef + newBaseStats.spDef),
+      speed: Math.max(1, pokemon.stats.speed - oldBaseStats.speed + newBaseStats.speed),
+    };
+  } else {
+    // Fallback: Nếu không có data stats của Mega thì tăng mỗi chỉ số 20 (trừ hp)
+    newStats = {
+      hp: pokemon.stats.hp,
+      attack: Math.floor(pokemon.stats.attack + 20),
+      defense: Math.floor(pokemon.stats.defense + 20),
+      spAtk: Math.floor(pokemon.stats.spAtk + 20),
+      spDef: Math.floor(pokemon.stats.spDef + 20),
+      speed: Math.floor(pokemon.stats.speed + 20),
+    };
+  }
+
+  const newTypes = megaForm?.types || pokemon.types;
 
   return {
     ...pokemon,
-    name: megaForm?.name || pokemon.name,
+    name: megaForm?.name || `${pokemon.name} Mega`,
     sprite: megaSprite,
     backSprite: megaBackSprite,
+    
+    // Cập nhật Stats và Types mới
     stats: newStats,
+    types: newTypes, 
+
     transformation: {
       form: 'mega',
       gmaxTurnsLeft: 0,
-      originalStats: pokemon.stats, // Backup Stats gốc
-      originalName: pokemon.name, // Backup Name gốc
+      
+      // Backup toàn bộ dữ liệu gốc để có thể revert (nếu cần) hoặc tra cứu
+      originalStats: pokemon.stats,
+      originalName: pokemon.name,
+      originalSprite: pokemon.sprite,
+      originalBackSprite: pokemon.backSprite,
+      originalMoves: pokemon.moves 
     },
   };
 };

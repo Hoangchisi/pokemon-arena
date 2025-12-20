@@ -1008,5 +1008,283 @@ export const POKEDEX: PokemonData[] = [
         stats: { hp: 100, attack: 130, defense: 100, spAtk: 63, spDef: 60, speed: 97 }
       }
     }
+  },
+  // ===================================================================
+  // MISSING MEGA EVOLUTION POKEMON
+  // ===================================================================
+  {
+    id: 80,
+    name: "Slowbro",
+    types: ["water", "psychic"],
+    stats: { hp: 95, attack: 75, defense: 110, spAtk: 100, spDef: 80, speed: 30 },
+    sprite: getSprite(80),
+    backSprite: getSprite(80),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Slowbro",
+        sprite: getSprite(10071),
+        backSprite: getSprite(10071),
+        stats: { hp: 95, attack: 75, defense: 180, spAtk: 130, spDef: 80, speed: 30 }
+      }
+    }
+  },
+  {
+    id: 115,
+    name: "Kangaskhan",
+    types: ["normal"],
+    stats: { hp: 105, attack: 95, defense: 80, spAtk: 40, spDef: 80, speed: 90 },
+    sprite: getSprite(115),
+    backSprite: getSprite(115),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Kangaskhan",
+        sprite: getSprite(10039),
+        backSprite: getSprite(10039),
+        stats: { hp: 105, attack: 125, defense: 100, spAtk: 60, spDef: 100, speed: 100 }
+      }
+    }
+  },
+  {
+    id: 127,
+    name: "Pinsir",
+    types: ["bug"],
+    stats: { hp: 65, attack: 125, defense: 100, spAtk: 55, spDef: 70, speed: 85 },
+    sprite: getSprite(127),
+    backSprite: getSprite(127),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Pinsir",
+        sprite: getSprite(10040),
+        backSprite: getSprite(10040),
+        stats: { hp: 65, attack: 155, defense: 120, spAtk: 65, spDef: 90, speed: 105 },
+        types: ["bug", "flying"] // Thêm hệ Flying
+      }
+    }
+  },
+  {
+    id: 214,
+    name: "Heracross",
+    types: ["bug", "fighting"],
+    stats: { hp: 80, attack: 125, defense: 75, spAtk: 40, spDef: 95, speed: 85 },
+    sprite: getSprite(214),
+    backSprite: getSprite(214),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Heracross",
+        sprite: getSprite(10047),
+        backSprite: getSprite(10047),
+        stats: { hp: 80, attack: 185, defense: 115, spAtk: 40, spDef: 105, speed: 75 }
+      }
+    }
+  },
+  {
+    id: 308,
+    name: "Medicham",
+    types: ["fighting", "psychic"],
+    stats: { hp: 60, attack: 60, defense: 75, spAtk: 60, spDef: 75, speed: 80 },
+    sprite: getSprite(308),
+    backSprite: getSprite(308),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Medicham",
+        sprite: getSprite(10054),
+        backSprite: getSprite(10054),
+        stats: { hp: 60, attack: 100, defense: 85, spAtk: 80, spDef: 85, speed: 100 }
+      }
+    }
+  },
+  {
+    id: 310,
+    name: "Manectric",
+    types: ["electric"],
+    stats: { hp: 70, attack: 75, defense: 60, spAtk: 105, spDef: 60, speed: 105 },
+    sprite: getSprite(310),
+    backSprite: getSprite(310),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Manectric",
+        sprite: getSprite(10055),
+        backSprite: getSprite(10055),
+        stats: { hp: 70, attack: 75, defense: 80, spAtk: 135, spDef: 80, speed: 135 }
+      }
+    }
+  },
+  {
+    id: 319,
+    name: "Sharpedo",
+    types: ["water", "dark"],
+    stats: { hp: 70, attack: 120, defense: 40, spAtk: 95, spDef: 40, speed: 95 },
+    sprite: getSprite(319),
+    backSprite: getSprite(319),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Sharpedo",
+        sprite: getSprite(10070),
+        backSprite: getSprite(10070),
+        stats: { hp: 70, attack: 140, defense: 70, spAtk: 110, spDef: 65, speed: 105 }
+      }
+    }
+  },
+  {
+    id: 323,
+    name: "Camerupt",
+    types: ["fire", "ground"],
+    stats: { hp: 70, attack: 100, defense: 70, spAtk: 105, spDef: 75, speed: 40 },
+    sprite: getSprite(323),
+    backSprite: getSprite(323),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Camerupt",
+        sprite: getSprite(10087),
+        backSprite: getSprite(10087),
+        stats: { hp: 70, attack: 120, defense: 100, spAtk: 145, spDef: 105, speed: 20 }
+      }
+    }
+  },
+  {
+    id: 334,
+    name: "Altaria",
+    types: ["dragon", "flying"],
+    stats: { hp: 75, attack: 70, defense: 90, spAtk: 70, spDef: 105, speed: 80 },
+    sprite: getSprite(334),
+    backSprite: getSprite(334),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Altaria",
+        sprite: getSprite(10067),
+        backSprite: getSprite(10067),
+        stats: { hp: 75, attack: 110, defense: 110, spAtk: 110, spDef: 105, speed: 80 },
+        types: ["dragon", "fairy"] // Đổi hệ sang Fairy
+      }
+    }
+  },
+  {
+    id: 354,
+    name: "Banette",
+    types: ["ghost"],
+    stats: { hp: 64, attack: 115, defense: 65, spAtk: 83, spDef: 63, speed: 65 },
+    sprite: getSprite(354),
+    backSprite: getSprite(354),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Banette",
+        sprite: getSprite(10056),
+        backSprite: getSprite(10056),
+        stats: { hp: 64, attack: 165, defense: 75, spAtk: 93, spDef: 83, speed: 75 }
+      }
+    }
+  },
+  {
+    id: 362,
+    name: "Glalie",
+    types: ["ice"],
+    stats: { hp: 80, attack: 80, defense: 80, spAtk: 80, spDef: 80, speed: 80 },
+    sprite: getSprite(362),
+    backSprite: getSprite(362),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Glalie",
+        sprite: getSprite(10074),
+        backSprite: getSprite(10074),
+        stats: { hp: 80, attack: 120, defense: 80, spAtk: 120, spDef: 80, speed: 100 }
+      }
+    }
+  },
+  {
+    id: 380,
+    name: "Latias",
+    types: ["dragon", "psychic"],
+    stats: { hp: 80, attack: 80, defense: 90, spAtk: 110, spDef: 130, speed: 110 },
+    sprite: getSprite(380),
+    backSprite: getSprite(380),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Latias",
+        sprite: getSprite(10062),
+        backSprite: getSprite(10062),
+        stats: { hp: 80, attack: 100, defense: 120, spAtk: 140, spDef: 150, speed: 110 }
+      }
+    }
+  },
+  {
+    id: 381,
+    name: "Latios",
+    types: ["dragon", "psychic"],
+    stats: { hp: 80, attack: 90, defense: 80, spAtk: 130, spDef: 110, speed: 110 },
+    sprite: getSprite(381),
+    backSprite: getSprite(381),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Latios",
+        sprite: getSprite(10063),
+        backSprite: getSprite(10063),
+        stats: { hp: 80, attack: 130, defense: 100, spAtk: 160, spDef: 120, speed: 110 }
+      }
+    }
+  },
+  {
+    id: 460,
+    name: "Abomasnow",
+    types: ["grass", "ice"],
+    stats: { hp: 90, attack: 92, defense: 75, spAtk: 92, spDef: 85, speed: 60 },
+    sprite: getSprite(460),
+    backSprite: getSprite(460),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Abomasnow",
+        sprite: getSprite(10060),
+        backSprite: getSprite(10060),
+        stats: { hp: 90, attack: 132, defense: 105, spAtk: 132, spDef: 105, speed: 30 }
+      }
+    }
+  },
+  {
+    id: 531,
+    name: "Audino",
+    types: ["normal"],
+    stats: { hp: 103, attack: 60, defense: 86, spAtk: 60, spDef: 86, speed: 50 },
+    sprite: getSprite(531),
+    backSprite: getSprite(531),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Audino",
+        sprite: getSprite(10069),
+        backSprite: getSprite(10069),
+        stats: { hp: 103, attack: 60, defense: 126, spAtk: 80, spDef: 126, speed: 50 },
+        types: ["normal", "fairy"] // Thêm hệ Fairy
+      }
+    }
+  },
+  {
+    id: 719,
+    name: "Diancie",
+    types: ["rock", "fairy"],
+    stats: { hp: 50, attack: 100, defense: 150, spAtk: 100, spDef: 150, speed: 50 },
+    sprite: getSprite(719),
+    backSprite: getSprite(719),
+    moves: [],
+    forms: {
+      mega: {
+        name: "Mega Diancie",
+        sprite: getSprite(10075),
+        backSprite: getSprite(10075),
+        stats: { hp: 50, attack: 160, defense: 110, spAtk: 160, spDef: 110, speed: 110 }
+      }
+    }
   }
 ];

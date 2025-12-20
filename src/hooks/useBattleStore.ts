@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { BattlePokemon, Move, TransformationState } from '@/types/battle';
 import { calculateDamage, handleMegaEvolution, handleGigantamax, handleTerastallize } from '@/lib/battle-logic';
+import { getPokemonByName } from '@/lib/pokemon-forms';
 
 // --- DANH SÁCH BACKGROUND ---
 const ARENA_BACKGROUNDS = [
@@ -34,6 +35,7 @@ interface BattleState {
     gmax: boolean;
     tera: boolean;
   };
+  enemyUsedMechanic: boolean;
 
   setupBattle: (myTeam: BattlePokemon[], enemyTeam: BattlePokemon[]) => void;
   // Cập nhật signature hàm executeTurn để nhận thêm tham số transformation
@@ -85,14 +87,19 @@ export const useBattleStore = create<BattleState>((set, get) => ({
   pendingEnemyTransformation: null,
   currentMusic: null,
   playerUsedMechanics: { mega: false, gmax: false, tera: false },
+  enemyUsedMechanic: false,
 
   setupBattle: (myTeam, enemyTeam) => {
     if (!myTeam || myTeam.length === 0 || !enemyTeam || enemyTeam.length === 0) return;
 
     const randomBg = ARENA_BACKGROUNDS[Math.floor(Math.random() * ARENA_BACKGROUNDS.length)];
+    const cleanMyTeam = JSON.parse(JSON.stringify(myTeam));
+    const cleanEnemyTeam = JSON.parse(JSON.stringify(enemyTeam));
 
     set({
-      myTeam, enemyTeam, activePlayerIndex: 0, activeEnemyIndex: 0,
+      myTeam: cleanMyTeam,
+      enemyTeam: cleanEnemyTeam,
+      activePlayerIndex: 0, activeEnemyIndex: 0,
       logs: [`Battle Start! Go ${myTeam[0].name}!`],
       winner: null, isPlayerTurn: true, mustSwitch: false, attackingSide: null,
       battleBackground: randomBg,
@@ -100,6 +107,7 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       pendingEnemyTransformation: null,
       currentMusic: null,
       playerUsedMechanics: { mega: false, gmax: false, tera: false },
+      enemyUsedMechanic: false,
     });
   },
 
@@ -119,7 +127,9 @@ export const useBattleStore = create<BattleState>((set, get) => ({
         // --- BACKUP DỮ LIỆU GỐC TRƯỚC KHI BIẾN HÌNH ---
         const originalSprite = pokemon.sprite;
         const originalBackSprite = pokemon.backSprite;
-        const originalMoves = pokemon.moves.map(m => ({ ...m })); // Deep copy moves
+        const originalMoves = pokemon.moves.map(m => ({ ...m }));
+        const originalName = pokemon.name; // Lưu tên gốc
+        // -----------------------------------------------------
 
         const transformed = handleGigantamax(pokemon);
         Object.assign(pokemon, transformed);
@@ -139,15 +149,20 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       pokemon.hasUsedMechanic = true;
 
       newTeam[activeIdx] = pokemon;
-      let newMechanics = { ...state.playerUsedMechanics };
+      let updateState: any = { [teamKey]: newTeam };
+
       if (side === 'player') {
+        let newMechanics = { ...state.playerUsedMechanics };
         if (formType === 'mega') newMechanics.mega = true;
         if (formType === 'gmax') newMechanics.gmax = true;
+        updateState.playerUsedMechanics = newMechanics;
+      } else {
+        // Nếu là Enemy thì đánh dấu enemyUsedMechanic
+        updateState.enemyUsedMechanic = true;
       }
 
       return {
-        [teamKey]: newTeam,
-        playerUsedMechanics: newMechanics, // Cập nhật object mới
+        ...updateState,
         currentMusic: "/music/metrics.mp3",
       };
     });
@@ -218,31 +233,76 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     const state = get();
     if (state.winner || state.mustSwitch || !state.isPlayerTurn) return;
 
-    const pIndex = state.activePlayerIndex;
-    const eIndex = state.activeEnemyIndex;
-
-    // Lấy dữ liệu TRƯỚC khi biến hình
-    const initialPlayerMon = state.myTeam[pIndex];
-    const initialEnemyMon = state.enemyTeam[eIndex];
+    const initialPlayerMon = state.myTeam[state.activePlayerIndex];
+    const initialEnemyMon = state.enemyTeam[state.activeEnemyIndex];
 
     set({ isPlayerTurn: false });
-    const enemyMove = getSmartEnemyMove(initialEnemyMon, initialPlayerMon);
 
     // =================================================================
-    // GIAI ĐOẠN 1: XỬ LÝ BIẾN HÌNH
+    // GIAI ĐOẠN 0: AI ENEMY BIẾN HÌNH
+    // =================================================================
+    if (!state.enemyUsedMechanic) {
+      const eIndex = state.activeEnemyIndex;
+      const enemyTeam = state.enemyTeam;
+      const currentEnemy = enemyTeam[eIndex];
+
+      // Logic: Chỉ dùng cho Pokemon cuối cùng
+      const isLastPokemon = eIndex === enemyTeam.length - 1;
+
+      if (isLastPokemon) {
+        const enemyData = getPokemonByName(currentEnemy.name);
+        const forms = enemyData?.forms;
+
+        if (forms) {
+          let aiAction: 'mega' | 'gmax' | null = null;
+
+          if (currentEnemy.aceMechanic) {
+            aiAction = currentEnemy.aceMechanic;
+          } else {
+            // Fallback: Tự động phát hiện nếu không có cài đặt
+            const enemyData = getPokemonByName(currentEnemy.name);
+            const forms = enemyData?.forms;
+            if (forms) {
+              if (forms.gmax) aiAction = 'gmax';
+              else if (forms.mega) aiAction = 'mega';
+            }
+          }
+
+          if (aiAction) {
+            get().applyTransformation('enemy', aiAction);
+
+            const actionName = aiAction === 'gmax' ? 'Gigantamaxed' : 'Mega Evolved';
+
+            // Cập nhật log ngay lập tức
+            set(s => ({
+              logs: [...s.logs, `Enemy's Ace ${currentEnemy.name} ${actionName}!`],
+              enemyUsedMechanic: true
+            }));
+
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+      }
+    }
+
+    // =================================================================
+    // GIAI ĐOẠN 1: PLAYER BIẾN HÌNH
     // =================================================================
     if (playerTransformation) {
+      const pIndex = get().activePlayerIndex;
+      const currentMonName = get().myTeam[pIndex].name;
       let transformLog = "";
-      const currentMonName = state.myTeam[pIndex].name;
 
       if (playerTransformation === 'mega') {
         get().applyTransformation('player', 'mega');
         transformLog = `${currentMonName} Mega Evolved!`;
-      } else if (playerTransformation === 'gmax') {
+      }
+      else if (playerTransformation === 'gmax') {
         get().applyTransformation('player', 'gmax');
         transformLog = `${currentMonName} Gigantamaxed!`;
-      } else if (playerTransformation === 'tera') {
-        const mon = state.myTeam[pIndex];
+      }
+      else if (playerTransformation === 'tera') {
+        const mon = get().myTeam[pIndex];
         const type = mon.selectedTeraType || mon.types[0];
         get().applyTerastallize('player', type);
         transformLog = `${currentMonName} Terastallized into ${type} type!`;
@@ -253,22 +313,17 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     }
 
     // =================================================================
-    // GIAI ĐOẠN 2: LẤY DỮ LIỆU MỚI NHẤT (QUAN TRỌNG)
+    // GIAI ĐOẠN 2 & 3: TÍNH TOÁN VÀ CHIẾN ĐẤU (GIỮ NGUYÊN)
     // =================================================================
     const currentState = get();
-    const updatedPlayerMon = currentState.myTeam[pIndex];
-    const currentEnemy = currentState.enemyTeam[eIndex];
+    const updatedPlayerMon = currentState.myTeam[currentState.activePlayerIndex];
+    const currentEnemy = currentState.enemyTeam[currentState.activeEnemyIndex];
 
+    // Lấy lại chiêu thức (để update damage nếu vừa Gmax)
     const updatedPlayerMove = updatedPlayerMon.moves.find(m => m.name === playerMove.name) || playerMove;
+    const enemyMove = getSmartEnemyMove(initialEnemyMon, initialPlayerMon);
 
-    // Debug để kiểm tra xem Power đã tăng chưa
-    if (playerTransformation === 'gmax') {
-        console.log(`Move Power Check: Old=${playerMove.power}, New=${updatedPlayerMove.power}`);
-    }
-    // =================================================================
-    // GIAI ĐOẠN 3: TÍNH TOÁN CHIÊU THỨC
-    // =================================================================
-    let playerGoesFirst = false;
+    let playerGoesFirst = true;
     const pPriority = updatedPlayerMove.priority || 0;
     const ePriority = enemyMove.priority || 0;
 
@@ -284,6 +339,32 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       if (attacker.currentHp === 0) return false;
       set({ attackingSide: isPlayerAttacking ? 'player' : 'enemy' });
       await new Promise(r => setTimeout(r, 300));
+
+      const moveAccuracy = move.accuracy !== undefined ? move.accuracy : 100;
+
+      // Random từ 0 -> 100
+      const hitChance = Math.random() * 100;
+
+      // Log tên chiêu trước
+      let currentLogs = [...get().logs, `${attacker.name} used ${move.name}!`];
+
+      // 2. KIỂM TRA TRÚNG / TRƯỢT
+      // Lưu ý: Các chiêu tất trúng (như Aerial Ace) hoặc đang Gmax (Max Moves tất trúng) có thể bỏ qua check này.
+      // Ở đây ta làm logic cơ bản:
+      let isMiss = hitChance > moveAccuracy;
+
+      // (Tùy chọn) Max Moves của Gmax thường không bao giờ trượt (trừ Max Guard)
+      if (attacker.transformation?.form === 'gmax') {
+        isMiss = false;
+      }
+
+      if (isMiss) {
+        // --- XỬ LÝ KHI TRƯỢT ---
+        currentLogs.push(`${attacker.name}'s attack missed!`);
+        set({ logs: currentLogs, attackingSide: null });
+        await new Promise(r => setTimeout(r, 1000));
+        return false; // Kết thúc lượt đánh, không ai chết
+      }
 
       const { damage, effectiveness, isCritical } = calculateDamage(attacker, defender, move);
       const newDefenderHp = Math.max(0, defender.currentHp - damage);
@@ -334,71 +415,105 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     if (playerGoesFirst) {
       const enemyFainted = await performAttack(updatedPlayerMon, currentEnemy, updatedPlayerMove, true);
       if (!enemyFainted) {
-        const latestEnemy = get().enemyTeam[get().activeEnemyIndex];
-        const latestPlayer = get().myTeam[get().activePlayerIndex];
+        const latestState = get();
+        const latestEnemy = latestState.enemyTeam[latestState.activeEnemyIndex];
+        const latestPlayer = latestState.myTeam[latestState.activePlayerIndex];
         await performAttack(latestEnemy, latestPlayer, enemyMove, false);
       }
     } else {
       const playerFainted = await performAttack(currentEnemy, updatedPlayerMon, enemyMove, false);
       if (!playerFainted) {
-        const latestPlayer = get().myTeam[get().activePlayerIndex];
-        const latestEnemy = get().enemyTeam[get().activeEnemyIndex];
+        const latestState = get();
+        const latestPlayer = latestState.myTeam[latestState.activePlayerIndex];
+        const latestEnemy = latestState.enemyTeam[latestState.activeEnemyIndex];
         await performAttack(latestPlayer, latestEnemy, updatedPlayerMove, true);
       }
     }
 
     // =================================================================
-    // GIAI ĐOẠN 4: END TURN PHASE (XỬ LÝ REVERT GMAX)
+    // GIAI ĐOẠN 4: END TURN PHASE (LOGIC TRỪ LƯỢT CHUẨN)
     // =================================================================
-    if (!get().winner && !get().mustSwitch) {
-      const stateEnd = get();
-      const endTurnPlayer = stateEnd.myTeam[stateEnd.activePlayerIndex];
+    if (!get().winner) {
+      // Lấy state MỚI NHẤT
+      const endTurnState = get();
 
-      if (endTurnPlayer.transformation?.form === 'gmax') {
-        const turnsLeft = (endTurnPlayer.transformation.gmaxTurnsLeft || 0) - 1;
+      const nextMyTeam = [...endTurnState.myTeam];
+      const nextEnemyTeam = [...endTurnState.enemyTeam];
+      const pIdx = endTurnState.activePlayerIndex;
+      const eIdx = endTurnState.activeEnemyIndex;
+
+      let turnLogs: string[] = [];
+
+      // --- PLAYER ---
+      const playerMon = nextMyTeam[pIdx];
+      if (playerMon.transformation?.form === 'gmax') {
+        const turnsLeft = (playerMon.transformation.gmaxTurnsLeft || 0) - 1;
 
         if (turnsLeft <= 0) {
-          // --- LOGIC REVERT ---
-          const revertedMon = { ...endTurnPlayer };
+          // Revert Player
+          const revertedMon = { ...playerMon };
+          if (playerMon.transformation.originalSprite) revertedMon.sprite = playerMon.transformation.originalSprite;
+          if (playerMon.transformation.originalBackSprite) revertedMon.backSprite = playerMon.transformation.originalBackSprite;
+          if (playerMon.transformation.originalName) revertedMon.name = playerMon.transformation.originalName;
+          if (playerMon.transformation.originalMoves) revertedMon.moves = playerMon.transformation.originalMoves;
 
-          // 1. Khôi phục Sprite
-          if (endTurnPlayer.transformation.originalSprite) revertedMon.sprite = endTurnPlayer.transformation.originalSprite;
-          if (endTurnPlayer.transformation.originalBackSprite) revertedMon.backSprite = endTurnPlayer.transformation.originalBackSprite;
-
-          // 2. Khôi phục Moves
-          if (endTurnPlayer.transformation.originalMoves) revertedMon.moves = endTurnPlayer.transformation.originalMoves;
-
-          // 3. Reset Form
           revertedMon.transformation = { form: 'normal' };
-
-          // 4. Reset HP (Chia đôi)
           revertedMon.currentHp = Math.ceil(revertedMon.currentHp / 2);
           revertedMon.maxHp = Math.ceil(revertedMon.maxHp / 2);
           if (revertedMon.currentHp > revertedMon.maxHp) revertedMon.currentHp = revertedMon.maxHp;
-          
-          if (endTurnPlayer.transformation.originalName) {
-             revertedMon.name = endTurnPlayer.transformation.originalName;
-          }
 
-          const newMyTeam = [...stateEnd.myTeam];
-          newMyTeam[stateEnd.activePlayerIndex] = revertedMon;
-
-          set(s => ({
-            myTeam: newMyTeam,
-            logs: [...s.logs, `${revertedMon.name} returned to normal!`]
-          }));
+          nextMyTeam[pIdx] = revertedMon;
+          turnLogs.push(`${revertedMon.name} returned to normal!`);
         } else {
-          // Giảm lượt
-          const updatedMon = {
-            ...endTurnPlayer,
-            transformation: { ...endTurnPlayer.transformation, gmaxTurnsLeft: turnsLeft }
+          nextMyTeam[pIdx] = {
+            ...playerMon,
+            transformation: { ...playerMon.transformation, gmaxTurnsLeft: turnsLeft }
           };
-          const newMyTeam = [...stateEnd.myTeam];
-          newMyTeam[stateEnd.activePlayerIndex] = updatedMon;
-          set({ myTeam: newMyTeam });
         }
       }
-      set({ isPlayerTurn: true });
+
+      // --- ENEMY ---
+      const enemyMon = nextEnemyTeam[eIdx];
+      if (enemyMon.transformation?.form === 'gmax') {
+        // Lấy số lượt hiện tại
+        const currentTurns = typeof enemyMon.transformation.gmaxTurnsLeft === 'number'
+          ? enemyMon.transformation.gmaxTurnsLeft
+          : 0;
+
+        // Luôn trừ 1 lượt
+        const turnsLeft = currentTurns - 1;
+
+        if (turnsLeft <= 0) {
+          // Revert Enemy
+          const revertedMon = { ...enemyMon };
+          if (enemyMon.transformation.originalSprite) revertedMon.sprite = enemyMon.transformation.originalSprite;
+          if (enemyMon.transformation.originalBackSprite) revertedMon.backSprite = enemyMon.transformation.originalBackSprite;
+          if (enemyMon.transformation.originalName) revertedMon.name = enemyMon.transformation.originalName;
+          if (enemyMon.transformation.originalMoves) revertedMon.moves = enemyMon.transformation.originalMoves;
+
+          revertedMon.transformation = { form: 'normal' };
+          revertedMon.currentHp = Math.ceil(revertedMon.currentHp / 2);
+          revertedMon.maxHp = Math.ceil(revertedMon.maxHp / 2);
+          if (revertedMon.currentHp > revertedMon.maxHp) revertedMon.currentHp = revertedMon.maxHp;
+
+          nextEnemyTeam[eIdx] = revertedMon;
+          turnLogs.push(`Enemy ${revertedMon.name} returned to normal!`);
+        } else {
+          nextEnemyTeam[eIdx] = {
+            ...enemyMon,
+            transformation: { ...enemyMon.transformation, gmaxTurnsLeft: turnsLeft }
+          };
+        }
+      }
+
+      set(s => ({
+        myTeam: nextMyTeam,
+        enemyTeam: nextEnemyTeam,
+        logs: [...s.logs, ...turnLogs],
+        // Chỉ trả lượt cho Player nếu KHÔNG PHẢI switch (để tránh hiện menu đè lên bảng switch)
+        // Tuy nhiên, nếu mustSwitch = true, UI sẽ ưu tiên hiển thị bảng Switch nên dòng này vẫn an toàn.
+        isPlayerTurn: true
+      }));
     }
   },
 

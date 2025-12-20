@@ -83,6 +83,8 @@ export interface BattlePokemon {
   selectedTeraType?: string | null; // Hệ được chọn cho Terastallize (set khi build team)
 
   hasUsedMechanic?: boolean; // Đã sử dụng Transformation hoặc Terastallize trong trận chưa
+
+  aceMechanic?: 'mega' | 'gmax';
 }
 
 // (Optional) Định nghĩa kết quả của một lượt tính toán damage

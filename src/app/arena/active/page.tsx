@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation"; // Thêm useSearchParams
 import { useBattleStore } from "@/hooks/useBattleStore";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { TypeBadge } from "@/components/ui/TypeBadge";
@@ -9,9 +9,13 @@ import { CategoryBadge } from "@/components/battle/CategoryBadge";
 import { MetricsModal } from "@/components/battle/MetricsModal";
 import { RefreshCw, RotateCcw, ArrowLeftRight, X, Zap, Shield, Sword, Activity, Sparkles , Crown} from "lucide-react";
 import { Move } from "@/types/battle";
+import { STAGE_ORDER } from "@/constants/stages"; // Import thứ tự màn chơi
+import { toast } from "react-hot-toast";
 
 export default function BattlePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [isMounted, setIsMounted] = useState(false);
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showMetricsModal, setShowMetricsModal] = useState(false);
@@ -19,6 +23,9 @@ export default function BattlePage() {
   const [hoveredSide, setHoveredSide] = useState<'player' | 'enemy' | null>(null);
   const [hoveredSwitchIdx, setHoveredSwitchIdx] = useState<number | null>(null);
   const [pendingTransformation, setPendingTransformation] = useState<'mega' | 'gmax' | 'tera' | null>(null);
+  
+  // State để chặn việc gọi API lưu nhiều lần
+  const [progressSaved, setProgressSaved] = useState(false);
 
   const {
     myTeam,
@@ -44,17 +51,54 @@ export default function BattlePage() {
     if (!myTeam || myTeam.length === 0) router.push("/arena");
   }, [myTeam, router]);
 
+  // --- LOGIC LƯU TIẾN ĐỘ ---
+  useEffect(() => {
+    if (winner === 'PLAYER' && !progressSaved) {
+      const stageKey = searchParams.get('stage'); 
+      
+      if (stageKey) {
+        setProgressSaved(true); // Lock lại ngay để tránh gọi API nhiều lần
+        
+        // @ts-ignore
+        const stageIndex = STAGE_ORDER.indexOf(stageKey);
+        
+        if (stageIndex !== -1) {
+            console.log(`Victory against ${stageKey} (Current Index: ${stageIndex})`);
+            
+            // GỌI API ĐỂ LƯU DATABASE
+            const saveToDb = async () => {
+                try {
+                    const res = await fetch('/api/user/progress', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        // Mở khóa màn tiếp theo (index + 1)
+                        body: JSON.stringify({ stageUnlocked: stageIndex + 1 })
+                    });
+
+                    if (!res.ok) throw new Error("Failed to save");
+                    
+                    toast.success("Progress Saved! Next champion unlocked.");
+                } catch (err) {
+                    console.error("Save progress error:", err);
+                    toast.error("Could not save progress.");
+                }
+            };
+
+            saveToDb();
+        }
+      }
+    }
+  }, [winner, progressSaved, searchParams]);
+
   if (!isMounted || !myTeam || myTeam.length === 0) return null;
 
   const playerPokemon = myTeam && myTeam.length > 0 ? myTeam[activePlayerIndex] : null;
   const enemyPokemon = enemyTeam && enemyTeam.length > 0 ? enemyTeam[activeEnemyIndex] : null;
 
   if (!playerPokemon || !enemyPokemon) return <div className="text-white text-center mt-10">Loading Battle...</div>;
+  
   const handleMoveSelect = (move: Move) => {
-    // Gửi cả Move và Lựa chọn biến hình vào Store
     executeTurn(move, pendingTransformation);
-
-    // Reset lựa chọn sau khi gửi xong
     setPendingTransformation(null);
   };
 
@@ -107,19 +151,6 @@ export default function BattlePage() {
     </div>
   );
 
-  // Determine the target Tera Type. 
-  // It prefers the 'selectedTeraType' set in the builder, otherwise defaults to the first type or logic handled in the store.
-  // In the updated MetricsModal logic, the modal determines the display type, 
-  // but here we just need to trigger the action. Ideally, applyTerastallize in store handles the type logic if not passed.
-  // However, based on your previous 'applyTerastallize' signature which took (side, type), 
-  // we might need to pass the type here if the store function expects it.
-  // Assuming 'applyTerastallize' in store can handle just (side) or we pass the pre-selected type from pokemon data.
-  const handleTerastallize = () => {
-    // Use the selected tera type if available, otherwise default to first type
-    const targetType = playerPokemon.selectedTeraType || playerPokemon.types[0];
-    applyTerastallize('player', targetType);
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-2 overflow-hidden">
       {/* Metrics Modal */}
@@ -127,11 +158,8 @@ export default function BattlePage() {
         isOpen={showMetricsModal}
         onClose={() => setShowMetricsModal(false)}
         pokemon={playerPokemon}
-
-        // Truyền State và Handler vào Modal
         selectedOption={pendingTransformation}
         onSelectOption={setPendingTransformation}
-
         isPlayerTurn={isPlayerTurn}
         usedMechanics={playerUsedMechanics}
       />
@@ -306,7 +334,7 @@ export default function BattlePage() {
                   <button
                     onClick={() => setShowMetricsModal(true)}
                     disabled={!isPlayerTurn}
-                    className={`bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md ${pendingTransformation ? 'ring-2 ring-yellow-400 bg-indigo-700' : ''} `}// Highlight nếu đang có lựa chọn`}
+                    className={`bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md ${pendingTransformation ? 'ring-2 ring-yellow-400 bg-indigo-700' : ''} `}
                   >
                     {pendingTransformation === 'mega' && <Crown size={18} className="text-yellow-400 animate-pulse" />}
                     {pendingTransformation === 'gmax' && <Zap size={18} className="text-red-400 animate-pulse" />}

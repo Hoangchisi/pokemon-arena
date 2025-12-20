@@ -49,6 +49,8 @@ model User {
   
   // Quan hệ với App (Team Builder)
   teams         Team[]
+
+  maxStageUnlocked Int      @default(0)
 }
 
 model VerificationToken {

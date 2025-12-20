@@ -3,135 +3,111 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Swords, Loader2, ChevronDown, AlertCircle } from "lucide-react";
-import { useBattleStore } from "@/hooks/useBattleStore";
-import { mapTeamToBattleTeam } from "@/lib/battle-mapper";
+import { Swords, Loader2, ChevronDown, AlertCircle, Trophy } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-const MOCK_NPC_TEAM = [
-  // 1. Spiritomb (Ghost/Dark) - Không có điểm yếu (trừ Fairy)
-  {
-    pokedexId: 442,
-    name: "spiritomb",
-    types: ["ghost", "dark"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/442.png",
-    // Stats thực tế ở Lv.50 (tương đối)
-    stats: { hp: 157, attack: 114, defense: 130, spAtk: 114, spDef: 130, speed: 55 },
-    selectedMoves: ["shadow-ball", "dark-pulse", "psychic", "sucker-punch"]
-  },
-  // 2. Roserade (Grass/Poison) - Sp.Atk cực cao
-  {
-    pokedexId: 407,
-    name: "roserade",
-    types: ["grass", "poison"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/407.png",
-    stats: { hp: 135, attack: 90, defense: 85, spAtk: 177, spDef: 125, speed: 142 },
-    selectedMoves: ["energy-ball", "sludge-bomb", "shadow-ball", "dazzling-gleam"]
-  },
-  // 3. Gastrodon (Water/Ground) - Tanker, chỉ sợ Cỏ
-  {
-    pokedexId: 423,
-    name: "gastrodon",
-    types: ["water", "ground"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/423.png",
-    stats: { hp: 218, attack: 103, defense: 88, spAtk: 114, spDef: 102, speed: 59 },
-    selectedMoves: ["earth-power", "muddy-water", "sludge-bomb", "ice-beam"]
-  },
-  // 4. Lucario (Fighting/Steel) - Attacker toàn diện
-  {
-    pokedexId: 448,
-    name: "lucario",
-    types: ["fighting", "steel"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/448.png",
-    stats: { hp: 145, attack: 132, defense: 90, spAtk: 137, spDef: 90, speed: 142 },
-    selectedMoves: ["aura-sphere", "flash-cannon", "dragon-pulse", "earthquake"]
-  },
-  // 5. Milotic (Water) - Sp.Def Tank cực trâu
-  {
-    pokedexId: 350,
-    name: "milotic",
-    types: ["water"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/350.png",
-    stats: { hp: 202, attack: 81, defense: 99, spAtk: 122, spDef: 147, speed: 101 },
-    selectedMoves: ["hydro-pump", "ice-beam", "dragon-pulse", "recover"]
-  },
-  // 6. Garchomp (Dragon/Ground) - ACE chủ lực, siêu mạnh & nhanh
-  {
-    pokedexId: 445,
-    name: "garchomp",
-    types: ["dragon", "ground"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/445.png",
-    stats: { hp: 183, attack: 182, defense: 115, spAtk: 100, spDef: 105, speed: 169 },
-    selectedMoves: ["dragon-claw", "earthquake", "stone-edge", "swords-dance"]
-  }
-];
+import { useBattleStore } from "@/hooks/useBattleStore";
+import { mapTeamToBattleTeam } from "@/lib/battle-mapper";
+import { LevelSelect } from "@/components/arena/LevelSelect"; // Component menu bạn đã tạo
+import { getStageInfo, StageKey } from "@/constants/stages";
+
+// Giả lập dữ liệu user tiến độ (Thực tế fetch API)
+// const MOCK_USER_DB = {
+//   maxStageUnlocked: 0
+// };
 
 export default function ArenaLobbyPage() {
   const router = useRouter();
   const { setupBattle } = useBattleStore();
 
-  const [isLoading, setIsLoading] = useState(false); 
-  const [isFetching, setIsFetching] = useState(true); 
-  const [myTeams, setMyTeams] = useState<any[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  // --- STATE ---
+  const [isLoading, setIsLoading] = useState(false); // Loading khi ấn Start
+  const [isFetchingTeams, setIsFetchingTeams] = useState(true); // Loading fetch team user
 
-  // 1. Fetch User Teams
+  const [myTeams, setMyTeams] = useState<any[]>([]); // Danh sách team của user
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(""); // ID team user chọn
+
+  const [progress, setProgress] = useState(0); // Tiến độ mở khóa
+  const [selectedStage, setSelectedStage] = useState<StageKey | null>(null); // Đối thủ đang chọn
+
+  // 1. Fetch User Teams & Progress
   useEffect(() => {
-    const fetchTeams = async () => {
+    const initData = async () => {
       try {
-        const res = await fetch("/api/teams");
-        if (!res.ok) {
-           if (res.status === 401) {
-             toast.error("Please login first");
-             router.push("/login");
-             return;
-           }
-           throw new Error("Failed to fetch");
+        // Fetch Teams
+        const teamRes = await fetch("/api/teams");
+        if (!teamRes.ok) {
+          if (teamRes.status === 401) {
+            toast.error("Please login first");
+            router.push("/login");
+            return;
+          }
+          throw new Error("Failed to fetch teams");
         }
-        const data = await res.json();
-        setMyTeams(data);
-        
-        if (data.length > 0) {
-          setSelectedTeamId(data[0].id);
+        const teamsData = await teamRes.json();
+        setMyTeams(teamsData);
+        if (teamsData.length > 0) setSelectedTeamId(teamsData[0].id);
+
+        // 2. FETCH PROGRESS TỪ API (MỚI)
+        const progressRes = await fetch("/api/user/progress");
+        if (progressRes.ok) {
+          const data = await progressRes.json();
+          // Cập nhật state progress từ database
+          setProgress(data.maxStageUnlocked);
         }
+        // setProgress(MOCK_USER_DB.maxStageUnlocked);
+
       } catch (error) {
         console.error(error);
-        toast.error("Could not load your teams");
+        toast.error("Could not load arena data");
       } finally {
-        setIsFetching(false);
+        setIsFetchingTeams(false);
       }
     };
 
-    fetchTeams();
+    initData();
   }, [router]);
 
-  // 2. Start Battle Handler
+  // 2. Xử lý chọn Stage từ Menu
+  const handleSelectStage = (stageKey: StageKey) => {
+    setSelectedStage(stageKey);
+    // Cuộn xuống phần chọn team (UX)
+    document.getElementById("team-selection")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // 3. Start Battle Handler
   const handleStartBattle = async () => {
-    if (!selectedTeamId) return toast.error("Please select a team!");
-    
+    // Validate Input
+    if (!selectedStage) return toast.error("Please select an opponent first!");
+    if (!selectedTeamId) return toast.error("Please select your team!");
+
     const selectedTeam = myTeams.find(t => t.id === selectedTeamId);
     if (!selectedTeam) return;
 
     if (selectedTeam.pokemons.length === 0) {
-        return toast.error("This team has no Pokemon!");
+      return toast.error("This team has no Pokemon!");
     }
 
     setIsLoading(true);
-    
-    try {
-      console.log("Mapping Battle Data...");
-      
-      // Map User Team
-      const playerBattleTeam = await mapTeamToBattleTeam(selectedTeam.pokemons);
-      
-      // Map NPC Team
-      const enemyBattleTeam = await mapTeamToBattleTeam(MOCK_NPC_TEAM);
 
-      // Setup Store (6vs6)
+    try {
+      console.log(`Starting battle against: ${selectedStage}`);
+
+      // A. Lấy thông tin NPC dựa trên Stage đã chọn
+      const stageInfo = getStageInfo(selectedStage);
+
+      // B. Map dữ liệu Team User
+      const playerBattleTeam = await mapTeamToBattleTeam(selectedTeam.pokemons);
+
+      // C. Map dữ liệu Team NPC
+      const enemyBattleTeam = await mapTeamToBattleTeam(stageInfo.team);
+
+      // D. Setup Store
       setupBattle(playerBattleTeam, enemyBattleTeam);
 
-      router.push("/arena/active"); 
-      
+      // E. Chuyển trang (Kèm query params để biết đang đánh ai -> phục vụ lưu kết quả)
+      router.push(`/arena/active?stage=${selectedStage}`);
+
     } catch (error) {
       console.error("Failed to start battle:", error);
       toast.error("Failed to initialize battle data");
@@ -141,97 +117,131 @@ export default function ArenaLobbyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
-        
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+    <div className="min-h-screen bg-slate-950 text-white p-4 pb-20">
+      <div className="max-w-6xl mx-auto space-y-8">
 
-        <div className="flex justify-center mb-4">
-          <div className="bg-red-500/20 p-6 rounded-full ring-2 ring-red-500/50 animate-pulse-slow">
-            <Swords size={64} className="text-red-500" />
+        {/* --- HEADER --- */}
+        <header className="text-center space-y-4 pt-8">
+          <div className="inline-flex items-center justify-center p-4 bg-red-500/10 rounded-full mb-2 ring-1 ring-red-500/30">
+            <Trophy size={48} className="text-yellow-500" />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-white uppercase tracking-wider">
-            Battle Arena
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent uppercase tracking-tight">
+            Battle Tower
           </h1>
-          <p className="text-slate-400 text-sm">
-            Select your squad and face the Champion!
+          <p className="text-slate-400 max-w-xl mx-auto text-lg">
+            Defeat the Regional Champions to prove yourself as the ultimate Pokémon Master!
           </p>
-        </div>
+        </header>
 
-        {isFetching ? (
-          <div className="py-8 flex flex-col items-center text-slate-500">
-            <Loader2 className="animate-spin mb-2" />
-            <span>Loading your teams...</span>
+        {/* --- SECTION 1: SELECT OPPONENT --- */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 px-4">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-600 text-xs font-bold">1</span>
+            <h2 className="text-xl font-bold text-slate-200">Select Opponent</h2>
           </div>
-        ) : myTeams.length === 0 ? (
-          <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg p-4 text-sm text-yellow-200 flex flex-col items-center gap-3">
-            <AlertCircle size={24} />
-            <p>You don't have any teams yet.</p>
-            <Link 
-              href="/dashboard/builder" 
-              className="bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 px-4 rounded w-full"
-            >
-              Go to Team Builder
-            </Link>
+
+          <LevelSelect
+            currentStageIndex={progress}
+            onSelectStage={handleSelectStage}
+          />
+
+          {/* Hiển thị ai đang được chọn */}
+          {selectedStage && (
+            <div className="mt-4 text-center animate-in fade-in slide-in-from-top-2">
+              <p className="text-slate-400">Selected Opponent:</p>
+              <p className="text-2xl font-bold text-yellow-400 uppercase tracking-widest">
+                {getStageInfo(selectedStage).displayName}
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* --- SECTION 2: SELECT YOUR TEAM --- */}
+        <section id="team-selection" className="max-w-xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+          <div className="flex items-center gap-2 mb-6 border-b border-slate-800 pb-4">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-xs font-bold">2</span>
+            <h2 className="text-xl font-bold text-slate-200">Prepare Your Squad</h2>
           </div>
-        ) : (
-          <div className="space-y-4 text-left">
-            <label className="block text-xs font-bold text-slate-500 uppercase">
-              Select Your Team
-            </label>
-            
-            <div className="relative">
-              <select
-                value={selectedTeamId}
-                onChange={(e) => setSelectedTeamId(e.target.value)}
-                className="w-full appearance-none bg-slate-800 border border-slate-600 text-white py-3 px-4 pr-8 rounded-lg focus:outline-none focus:border-red-500 transition-colors cursor-pointer"
-              >
-                {myTeams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name} ({team.pokemons.length} Pokemon)
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                <ChevronDown size={16} />
+
+          {isFetchingTeams ? (
+            <div className="flex justify-center py-8 text-slate-500">
+              <Loader2 className="animate-spin mr-2" /> Loading teams...
+            </div>
+          ) : myTeams.length === 0 ? (
+            <div className="text-center py-6 bg-yellow-500/5 rounded-lg border border-yellow-500/20">
+              <AlertCircle className="mx-auto text-yellow-500 mb-2" />
+              <p className="text-yellow-200 mb-4">You have no teams ready.</p>
+              <Link href="/team-builder" className="inline-block bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 px-4 rounded transition-colors">
+                Create a Team
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Dropdown */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase">Select Team</label>
+                <div className="relative">
+                  <select
+                    value={selectedTeamId}
+                    onChange={(e) => setSelectedTeamId(e.target.value)}
+                    className="w-full appearance-none bg-slate-800 border-2 border-slate-700 text-white py-3 px-4 pr-8 rounded-xl focus:outline-none focus:border-blue-500 transition-colors cursor-pointer text-lg"
+                  >
+                    {myTeams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                </div>
               </div>
-            </div>
 
-            <div className="flex gap-2 justify-center py-2 h-12">
-               {myTeams.find(t => t.id === selectedTeamId)?.pokemons.map((p: any) => (
-                 <img key={p.id} src={p.spriteUrl} alt={p.name} className="h-10 w-10 pixelated object-contain bg-slate-800 rounded-full border border-slate-700" title={p.name} />
-               ))}
+              {/* Team Preview Icons */}
+              <div className="flex justify-center gap-2 h-14 p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
+                {myTeams.find(t => t.id === selectedTeamId)?.pokemons.map((p: any) => (
+                  <div key={p.id} className="relative group">
+                    <img
+                      src={p.spriteUrl}
+                      alt={p.name}
+                      className="h-10 w-10 pixelated object-contain bg-slate-800 rounded-full border border-slate-700 group-hover:border-blue-400 transition-colors"
+                    />
+                    {/* Tooltip nhỏ */}
+                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                      {p.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* START BUTTON */}
+              <button
+                onClick={handleStartBattle}
+                disabled={isLoading || !selectedStage}
+                className={`
+                    w-full py-4 px-6 rounded-xl font-bold text-xl uppercase tracking-wider
+                    flex items-center justify-center gap-3 shadow-lg transition-all duration-200 transform active:scale-95
+                    ${!selectedStage
+                    ? "bg-slate-700 text-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-red-900/20"
+                  }
+                  `}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" /> Starting...
+                  </>
+                ) : !selectedStage ? (
+                  <>Select an Opponent above</>
+                ) : (
+                  <>
+                    <Swords size={28} />
+                    Battle {getStageInfo(selectedStage).displayName}!
+                  </>
+                )}
+              </button>
             </div>
-            
-            <button
-              onClick={handleStartBattle}
-              disabled={isLoading}
-              className="
-                w-full py-4 px-6 rounded-xl font-bold text-lg text-white
-                bg-gradient-to-r from-red-600 to-orange-600 
-                hover:from-red-500 hover:to-orange-500
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-all duration-200 transform active:scale-95
-                flex items-center justify-center gap-3 shadow-lg shadow-red-900/20
-              "
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  INITIALIZING...
-                </>
-              ) : (
-                <>
-                  <Swords size={24} />
-                  FIGHT!
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          )}
+        </section>
       </div>
     </div>
   );
