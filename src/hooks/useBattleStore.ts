@@ -109,6 +109,7 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       const activeIdx = side === 'player' ? state.activePlayerIndex : state.activeEnemyIndex;
       const newTeam = [...state[teamKey]];
       const pokemon = { ...newTeam[activeIdx] };
+      const originalName = pokemon.name;
 
       if (formType === 'mega') {
         const transformed = handleMegaEvolution(pokemon);
@@ -131,6 +132,7 @@ export const useBattleStore = create<BattleState>((set, get) => ({
           originalSprite,
           originalBackSprite,
           originalMoves,
+          originalName
         };
       }
 
@@ -373,6 +375,10 @@ export const useBattleStore = create<BattleState>((set, get) => ({
           revertedMon.currentHp = Math.ceil(revertedMon.currentHp / 2);
           revertedMon.maxHp = Math.ceil(revertedMon.maxHp / 2);
           if (revertedMon.currentHp > revertedMon.maxHp) revertedMon.currentHp = revertedMon.maxHp;
+          
+          if (endTurnPlayer.transformation.originalName) {
+             revertedMon.name = endTurnPlayer.transformation.originalName;
+          }
 
           const newMyTeam = [...stateEnd.myTeam];
           newMyTeam[stateEnd.activePlayerIndex] = revertedMon;
