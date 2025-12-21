@@ -7,81 +7,54 @@ import { Swords, Loader2, ChevronDown, AlertCircle, Trophy } from "lucide-react"
 import { toast } from "react-hot-toast";
 
 import { useBattleStore } from "@/hooks/useBattleStore";
+import { useUserStore } from "@/hooks/useUserStore"; // Import Store mới
 import { mapTeamToBattleTeam } from "@/lib/battle-mapper";
-import { LevelSelect } from "@/components/arena/LevelSelect"; // Component menu bạn đã tạo
+import { LevelSelect } from "@/components/arena/LevelSelect";
 import { getStageInfo, StageKey } from "@/constants/stages";
-
-// Giả lập dữ liệu user tiến độ (Thực tế fetch API)
-// const MOCK_USER_DB = {
-//   maxStageUnlocked: 0
-// };
 
 export default function ArenaLobbyPage() {
   const router = useRouter();
   const { setupBattle } = useBattleStore();
+  
+  // 1. Lấy dữ liệu từ UserStore (Global Cache)
+  const { 
+    mySavedTeam, 
+    maxStageUnlocked, 
+    isDataLoaded,
+    fetchUserData 
+  } = useUserStore();
 
-  // --- STATE ---
-  const [isLoading, setIsLoading] = useState(false); // Loading khi ấn Start
-  const [isFetchingTeams, setIsFetchingTeams] = useState(true); // Loading fetch team user
+  // --- LOCAL STATE (UI Interaction) ---
+  const [isLoading, setIsLoading] = useState(false); // Loading khi ấn Start Battle
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(""); 
+  const [selectedStage, setSelectedStage] = useState<StageKey | null>(null);
 
-  const [myTeams, setMyTeams] = useState<any[]>([]); // Danh sách team của user
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(""); // ID team user chọn
-
-  const [progress, setProgress] = useState(0); // Tiến độ mở khóa
-  const [selectedStage, setSelectedStage] = useState<StageKey | null>(null); // Đối thủ đang chọn
-
-  // 1. Fetch User Teams & Progress
+  // 2. Fetch Data khi mount (Store sẽ tự check cache, nếu có rồi thì không fetch lại)
   useEffect(() => {
-    const initData = async () => {
-      try {
-        // Fetch Teams
-        const teamRes = await fetch("/api/teams");
-        if (!teamRes.ok) {
-          if (teamRes.status === 401) {
-            toast.error("Please login first");
-            router.push("/login");
-            return;
-          }
-          throw new Error("Failed to fetch teams");
-        }
-        const teamsData = await teamRes.json();
-        setMyTeams(teamsData);
-        if (teamsData.length > 0) setSelectedTeamId(teamsData[0].id);
+    fetchUserData();
+  }, [fetchUserData]);
 
-        // 2. FETCH PROGRESS TỪ API (MỚI)
-        const progressRes = await fetch("/api/user/progress");
-        if (progressRes.ok) {
-          const data = await progressRes.json();
-          // Cập nhật state progress từ database
-          setProgress(data.maxStageUnlocked);
-        }
-        // setProgress(MOCK_USER_DB.maxStageUnlocked);
+  // 3. Tự động chọn team đầu tiên khi dữ liệu load xong
+  useEffect(() => {
+    if (mySavedTeam.length > 0 && !selectedTeamId) {
+      setSelectedTeamId(mySavedTeam[0].id);
+    }
+  }, [mySavedTeam, selectedTeamId]);
 
-      } catch (error) {
-        console.error(error);
-        toast.error("Could not load arena data");
-      } finally {
-        setIsFetchingTeams(false);
-      }
-    };
-
-    initData();
-  }, [router]);
-
-  // 2. Xử lý chọn Stage từ Menu
+  // 4. Xử lý chọn Stage từ Menu
   const handleSelectStage = (stageKey: StageKey) => {
     setSelectedStage(stageKey);
-    // Cuộn xuống phần chọn team (UX)
+    // Cuộn xuống phần chọn team
     document.getElementById("team-selection")?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // 3. Start Battle Handler
+  // 5. Start Battle Handler
   const handleStartBattle = async () => {
     // Validate Input
     if (!selectedStage) return toast.error("Please select an opponent first!");
     if (!selectedTeamId) return toast.error("Please select your team!");
 
-    const selectedTeam = myTeams.find(t => t.id === selectedTeamId);
+    const selectedTeam = mySavedTeam.find(t => t.id === selectedTeamId);
     if (!selectedTeam) return;
 
     if (selectedTeam.pokemons.length === 0) {
@@ -93,7 +66,7 @@ export default function ArenaLobbyPage() {
     try {
       console.log(`Starting battle against: ${selectedStage}`);
 
-      // A. Lấy thông tin NPC dựa trên Stage đã chọn
+      // A. Lấy thông tin NPC
       const stageInfo = getStageInfo(selectedStage);
 
       // B. Map dữ liệu Team User
@@ -105,7 +78,7 @@ export default function ArenaLobbyPage() {
       // D. Setup Store
       setupBattle(playerBattleTeam, enemyBattleTeam);
 
-      // E. Chuyển trang (Kèm query params để biết đang đánh ai -> phục vụ lưu kết quả)
+      // E. Chuyển trang
       router.push(`/arena/active?stage=${selectedStage}`);
 
     } catch (error) {
@@ -141,11 +114,10 @@ export default function ArenaLobbyPage() {
           </div>
 
           <LevelSelect
-            currentStageIndex={progress}
+            currentStageIndex={maxStageUnlocked} // Sử dụng data từ Store
             onSelectStage={handleSelectStage}
           />
 
-          {/* Hiển thị ai đang được chọn */}
           {selectedStage && (
             <div className="mt-4 text-center animate-in fade-in slide-in-from-top-2">
               <p className="text-slate-400">Selected Opponent:</p>
@@ -163,11 +135,11 @@ export default function ArenaLobbyPage() {
             <h2 className="text-xl font-bold text-slate-200">Prepare Your Squad</h2>
           </div>
 
-          {isFetchingTeams ? (
+          {!isDataLoaded ? (
             <div className="flex justify-center py-8 text-slate-500">
               <Loader2 className="animate-spin mr-2" /> Loading teams...
             </div>
-          ) : myTeams.length === 0 ? (
+          ) : mySavedTeam.length === 0 ? (
             <div className="text-center py-6 bg-yellow-500/5 rounded-lg border border-yellow-500/20">
               <AlertCircle className="mx-auto text-yellow-500 mb-2" />
               <p className="text-yellow-200 mb-4">You have no teams ready.</p>
@@ -186,7 +158,7 @@ export default function ArenaLobbyPage() {
                     onChange={(e) => setSelectedTeamId(e.target.value)}
                     className="w-full appearance-none bg-slate-800 border-2 border-slate-700 text-white py-3 px-4 pr-8 rounded-xl focus:outline-none focus:border-blue-500 transition-colors cursor-pointer text-lg"
                   >
-                    {myTeams.map((team) => (
+                    {mySavedTeam.map((team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
                       </option>
@@ -198,14 +170,13 @@ export default function ArenaLobbyPage() {
 
               {/* Team Preview Icons */}
               <div className="flex justify-center gap-2 h-14 p-2 bg-slate-950/50 rounded-xl border border-slate-800/50">
-                {myTeams.find(t => t.id === selectedTeamId)?.pokemons.map((p: any) => (
+                {mySavedTeam.find(t => t.id === selectedTeamId)?.pokemons.map((p: any) => (
                   <div key={p.id} className="relative group">
                     <img
                       src={p.spriteUrl}
                       alt={p.name}
                       className="h-10 w-10 pixelated object-contain bg-slate-800 rounded-full border border-slate-700 group-hover:border-blue-400 transition-colors"
                     />
-                    {/* Tooltip nhỏ */}
                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                       {p.name}
                     </div>

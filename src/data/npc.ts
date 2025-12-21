@@ -15,7 +15,7 @@ export interface NPCPokemon {
   
   // --- THÊM TRƯỜNG NÀY ---
   // Định nghĩa cụ thể Ace này sẽ dùng gì: 'mega', 'gmax', hoặc 'tera'
-  aceMechanic?: 'mega' | 'gmax'; 
+  aceMechanic?: 'mega' | 'gmax' | 'tera'; 
 }
 
 const getSprite = (id: number) => 
@@ -357,9 +357,8 @@ export const DIANTHA_TEAM: NPCPokemon[] = [
   }
 ];
 // ... (Các import và code cũ giữ nguyên)
-
 // =====================================================================
-// 7. BLUE (Kanto Champion/Rival) - Ace: Pidgeot -> Mega
+// 7. BLUE (Kanto Champion/Rival) - Ace: Blastoise -> Mega
 // =====================================================================
 export const BLUE_TEAM: NPCPokemon[] = [
   {
@@ -402,15 +401,15 @@ export const BLUE_TEAM: NPCPokemon[] = [
     stats: { hp: 162, attack: 70, defense: 65, spAtk: 155, spDef: 115, speed: 140 },
     selectedMoves: ["psychic", "shadow-ball", "focus-blast", "dazzling-gleam"]
   },
-  // ACE: Pidgeot (Sẽ Mega)
+  // ACE: Blastoise (Sẽ Mega)
   {
-    pokedexId: 18,
-    name: "pidgeot",
-    types: ["normal", "flying"],
-    spriteUrl: getSprite(18),
-    stats: { hp: 190, attack: 100, defense: 95, spAtk: 90, spDef: 90, speed: 121 },
-    selectedMoves: ["hurricane", "heat-wave", "u-turn", "roost"],
-    aceMechanic: 'mega' // Mega Pidgeot (No Guard Hurricane)
+    pokedexId: 9,
+    name: "blastoise",
+    types: ["water"],
+    spriteUrl: getSprite(9),
+    stats: { hp: 186, attack: 103, defense: 120, spAtk: 135, spDef: 125, speed: 98 },
+    selectedMoves: ["hydro-pump", "ice-beam", "aura-sphere", "dark-pulse"],
+    aceMechanic: 'mega' // Mega Blastoise
   }
 ];
 
@@ -466,6 +465,7 @@ export const IRIS_TEAM: NPCPokemon[] = [
     spriteUrl: getSprite(612),
     stats: { hp: 183, attack: 167, defense: 110, spAtk: 80, spDef: 90, speed: 117 },
     selectedMoves: ["outrage", "earthquake", "iron-tail", "dragon-dance"],
+    aceMechanic: 'tera' // Tera Dragon
   }
 ];
 
@@ -521,6 +521,7 @@ export const ALDER_TEAM: NPCPokemon[] = [
     spriteUrl: getSprite(637),
     stats: { hp: 192, attack: 80, defense: 85, spAtk: 155, spDef: 125, speed: 120 },
     selectedMoves: ["quiver-dance", "fiery-dance", "bug-buzz", "psychic"],
+    aceMechanic: 'tera'
   }
 ];
 
@@ -576,6 +577,7 @@ export const GEETA_TEAM: NPCPokemon[] = [
     spriteUrl: getSprite(970),
     stats: { hp: 190, attack: 75, defense: 110, spAtk: 150, spDef: 101, speed: 106 },
     selectedMoves: ["tera-blast", "sludge-wave", "power-gem", "earth-power"],
+    aceMechanic: 'tera'
   }
 ];
 

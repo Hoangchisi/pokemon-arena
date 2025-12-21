@@ -3,8 +3,8 @@ import { NPC_DATA } from "@/data/npc";
 export const STAGE_ORDER = [
   'lance',
   'steven',
-  'diantha',
   'alder',   // Mới
+  'diantha',
   'iris',    // Mới
   'cynthia',
   'leon',

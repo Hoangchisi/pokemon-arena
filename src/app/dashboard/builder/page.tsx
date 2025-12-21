@@ -11,8 +11,10 @@ import { getPokemonByName } from "@/lib/pokemon-forms";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
 import { TeamMember } from "@/types/pokemon";
 import { TypeBadge } from "@/components/ui/TypeBadge";
+// Import Store
+import { useUserStore } from "@/hooks/useUserStore";
 
-// --- BẢNG MÀU GRADIENT (Cho nền thẻ Pokemon) ---
+// ... (Các hằng số TYPE_GRADIENTS, TYPE_COLORS, ALL_TYPES giữ nguyên như cũ)
 const TYPE_GRADIENTS: Record<string, string> = {
   normal: "from-neutral-700/50 to-slate-900 border-neutral-600",
   fire: "from-orange-900/60 to-slate-900 border-orange-600",
@@ -34,7 +36,6 @@ const TYPE_GRADIENTS: Record<string, string> = {
   fairy: "from-pink-900/60 to-slate-900 border-pink-500",
 };
 
-// --- BẢNG MÀU BADGE (Cho Move) ---
 const TYPE_COLORS: Record<string, string> = {
   normal: "bg-neutral-500", fire: "bg-orange-500", water: "bg-blue-500",
   electric: "bg-yellow-500", grass: "bg-green-500", ice: "bg-sky-400",
@@ -44,7 +45,6 @@ const TYPE_COLORS: Record<string, string> = {
   steel: "bg-slate-400", dark: "bg-neutral-800", fairy: "bg-pink-400",
 };
 
-// --- DANH SÁCH CÁC HỆ LOẠI ---
 const ALL_TYPES = [
   'normal', 'fire', 'water', 'electric', 'grass', 'ice', 'fighting', 'poison',
   'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark',
@@ -52,70 +52,93 @@ const ALL_TYPES = [
 ];
 
 export default function TeamBuilderPage() {
-  // --- STATES ---
+  // --- KẾT NỐI STORE (Thay thế cho state savedTeams cũ) ---
+  const { 
+    mySavedTeam,     // Danh sách team từ cache
+    fetchUserData,   // Hàm fetch thông minh (chỉ fetch nếu chưa có)
+    setSavedTeam,    // Hàm cập nhật cache thủ công
+    isDataLoaded     // Cờ kiểm tra đã load chưa
+  } = useUserStore();
+
+  // --- LOCAL STATES ---
   const [teamName, setTeamName] = useState("My New Team");
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
-  // Sidebar Lists
-  const [savedTeams, setSavedTeams] = useState<any[]>([]);
-  const [isLoadingTeams, setIsLoadingTeams] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
+  
   // Modal Search
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalQuery, setModalQuery] = useState("");
   const [modalResults, setModalResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [openTeraDropdownId, setOpenTeraDropdownId] = useState<string | null>(null);
 
-  // --- API CALLS ---
-
-  // 1. Lấy danh sách team đã lưu
-  const fetchSavedTeams = async () => {
-    setIsLoadingTeams(true);
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setSavedTeams(data);
-      }
-    } catch (error) {
-      toast.error("Failed to load teams");
-    } finally {
-      setIsLoadingTeams(false);
-    }
-  };
-
+  // --- INITIALIZATION ---
   useEffect(() => {
-    fetchSavedTeams();
-  }, []);
+    // Gọi hàm này ngay khi vào trang.
+    // Nếu store đã có dữ liệu (từ trang Arena), nó sẽ dùng luôn cache -> KO LOAD LẠI
+    fetchUserData();
+  }, [fetchUserData]);
 
+  // --- LOGIC LOAD TEAM EDIT ---
   // 2. Load 1 team để chỉnh sửa
-  const loadTeamToEdit = (savedTeam: any) => {
+  const loadTeamToEdit = async (savedTeam: any) => {
     setEditingTeamId(savedTeam.id);
     setTeamName(savedTeam.name);
 
+    // Bước 1: Map dữ liệu cơ bản để hiển thị NGAY LẬP TỨC
     const mappedPokemons: TeamMember[] = savedTeam.pokemons.map((p: any) => ({
       uuid: uuidv4(),
-      id: p.pokedexId, name: p.name, types: p.types, sprite: p.spriteUrl,
+      id: p.pokedexId, 
+      name: p.name, 
+      types: p.types, 
+      sprite: p.spriteUrl,
       stats: {
         hp: p.hp, attack: p.attack, defense: p.defense,
         spAtk: p.spAtk, spDef: p.spDef, speed: p.stats?.speed || p.speed
       },
-      moves: [],
+      moves: [], // Ban đầu để rỗng để render nhanh
+      // Lấy lại các move đã chọn từ DB
       selectedMoves: [p.move1, p.move2, p.move3, p.move4].filter(Boolean),
-      selectedTeraType: p.teraType || null,
+      // Lấy lại Tera Type (Ưu tiên từ DB, nếu không có thì null)
+      selectedTeraType: p.teraType || null, 
     }));
 
     setTeam(mappedPokemons);
-    toast.success(`Loaded team: ${savedTeam.name}`);
+    // toast.success(`Loaded team: ${savedTeam.name}`);
+
+    // Bước 2: "Hydrate" - Lấy lại thông tin chi tiết (Moves) chạy ngầm
+    // Để không chặn UI, ta dùng Promise.all nhưng không await ở cấp cao nhất
+    toast.loading("Restoring move details...", { id: "restore-data" });
+    
+    try {
+      const enrichedTeam = await Promise.all(mappedPokemons.map(async (member) => {
+        // Kiểm tra cache local hoặc gọi API lấy full moves
+        const data = await getPokemonDetails(member.name); // Hoặc dùng getPokemonByName nếu có cache local tốt
+        
+        if (data) {
+          return {
+            ...member,
+            moves: data.moves, // Nạp lại danh sách moves đầy đủ (có power, type...)
+            stats: data.stats  // Cập nhật lại stats chuẩn (đề phòng DB lưu sai)
+          };
+        }
+        return member;
+      }));
+
+      // Cập nhật lại state lần 2 với đầy đủ thông tin
+      setTeam(enrichedTeam);
+      toast.success("Team data restored completely!", { id: "restore-data" });
+    } catch (error) {
+      toast.error("Could not fetch move details", { id: "restore-data" });
+    }
   };
 
-  // 3. Tải danh sách Move (nếu load từ DB chưa có)
+  // --- ACTIONS ---
+
   const refreshMemberData = async (uuid: string, name: string) => {
     toast.loading(`Fetching moves for ${name}...`, { id: "loading-moves" });
-
-    // Ưu tiên dữ liệu local - nhưng chỉ nếu có moves data
     const localData = getPokemonByName(name);
     if (localData && localData.moves && localData.moves.length > 0) {
       setTeam(prev => prev.map(member => {
@@ -125,8 +148,6 @@ export default function TeamBuilderPage() {
       toast.success("Moves loaded!", { id: "loading-moves" });
       return;
     }
-
-    // Fallback: gọi PokeAPI để lấy moves
     const data = await getPokemonDetails(name);
     if (data) {
       setTeam(prev => prev.map(member => {
@@ -138,8 +159,6 @@ export default function TeamBuilderPage() {
       toast.error("Failed to load moves", { id: "loading-moves" });
     }
   };
-
-  // --- ACTIONS ---
 
   const toggleMove = (memberUuid: string, moveName: string) => {
     const currentMember = team.find(m => m.uuid === memberUuid);
@@ -176,8 +195,12 @@ export default function TeamBuilderPage() {
     if (!confirm("Delete this team?")) return;
     try {
       await fetch(`/api/teams/${id}`, { method: "DELETE" });
+      
+      // CẬP NHẬT STORE NGAY LẬP TỨC (Optimistic Update)
+      const updatedList = mySavedTeam.filter(t => t.id !== id);
+      setSavedTeam(updatedList);
+      
       toast.success("Team deleted");
-      fetchSavedTeams();
       if (editingTeamId === id) resetBuilder();
     } catch (err) { toast.error("Failed to delete"); }
   };
@@ -185,14 +208,28 @@ export default function TeamBuilderPage() {
   const saveTeamToDb = async () => {
     if (team.length === 0) return toast.error("Empty team!");
     setIsSaving(true);
+
     const payload = {
       name: teamName,
       pokemons: team.map((p, index) => ({
-        pokedexId: p.id, name: p.name, hp: p.stats.hp, attack: p.stats.attack,
-        defense: p.stats.defense, spAtk: p.stats.spAtk, spDef: p.stats.spDef, speed: p.stats.speed,
-        types: p.types, spriteUrl: p.sprite, order: index,
-        move1: p.selectedMoves[0], move2: p.selectedMoves[1],
-        move3: p.selectedMoves[2], move4: p.selectedMoves[3],
+        pokedexId: p.id,
+        name: p.name,
+        // Stats
+        hp: p.stats.hp,
+        attack: p.stats.attack,
+        defense: p.stats.defense,
+        spAtk: p.stats.spAtk,
+        spDef: p.stats.spDef,
+        speed: p.stats.speed,
+        // Visuals
+        types: p.types,
+        spriteUrl: p.sprite,
+        order: index,
+        // Moves - QUAN TRỌNG: Thêm || null để tránh gửi undefined gây lỗi backend
+        move1: p.selectedMoves[0] || null,
+        move2: p.selectedMoves[1] || null,
+        move3: p.selectedMoves[2] || null,
+        move4: p.selectedMoves[3] || null,
         teraType: p.selectedTeraType || null,
       }))
     };
@@ -200,19 +237,54 @@ export default function TeamBuilderPage() {
     try {
       let res;
       if (editingTeamId) {
-        res = await fetch(`/api/teams/${editingTeamId}`, { method: "PUT", body: JSON.stringify(payload) });
+        res = await fetch(`/api/teams/${editingTeamId}`, { 
+            method: "PUT", 
+            body: JSON.stringify(payload) 
+        });
       } else {
-        res = await fetch("/api/teams", { method: "POST", body: JSON.stringify(payload) });
+        res = await fetch("/api/teams", { 
+            method: "POST", 
+            body: JSON.stringify(payload) 
+        });
       }
-      if (!res.ok) throw new Error("Failed");
-      toast.success(editingTeamId ? "Team updated!" : "Team created!");
-      fetchSavedTeams();
-      if (!editingTeamId) {
-        const newTeam = await res.json();
-        setEditingTeamId(newTeam.id);
+
+      // --- SỬA ĐOẠN NÀY ĐỂ DEBUG ---
+      if (!res.ok) {
+        const errorDetail = await res.text(); // Đọc tin nhắn lỗi từ server
+        console.error("SERVER ERROR:", errorDetail); // In ra console của trình duyệt (F12)
+        throw new Error(errorDetail || "Failed to save team");
       }
-    } catch (error) { toast.error("Error saving team"); }
-    finally { setIsSaving(false); }
+      // -----------------------------
+
+      const savedData = await res.json();
+
+      // (Đoạn fix undefined slice giữ nguyên)
+      if (!savedData.pokemons || savedData.pokemons.length === 0) {
+        savedData.pokemons = team.map(p => ({
+            id: p.id,
+            name: p.name,
+            spriteUrl: p.sprite,
+            types: p.types
+        }));
+      }
+
+      if (editingTeamId) {
+        const updatedList = mySavedTeam.map(t => t.id === editingTeamId ? savedData : t);
+        setSavedTeam(updatedList);
+        toast.success("Team updated!");
+      } else {
+        setSavedTeam([savedData, ...mySavedTeam]);
+        setEditingTeamId(savedData.id);
+        toast.success("Team created!");
+      }
+
+    } catch (error: any) {
+      console.error("Save Error:", error);
+      // Hiển thị lỗi chi tiết lên thông báo để bạn biết sai ở đâu
+      toast.error(`Error: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // --- MODAL LOGIC ---
@@ -228,25 +300,17 @@ export default function TeamBuilderPage() {
     e.preventDefault();
     if (!modalQuery.trim()) return;
     setIsSearching(true);
-
-    // Gọi hàm tìm kiếm từ API
     const results = await searchPokemonList(modalQuery);
-
-    // LỌC BỎ CÁC DẠNG MEGA VÀ GMAX
     const filteredResults = results.filter((p: any) => {
       const name = p.name.toLowerCase();
-      // Loại bỏ nếu tên chứa "mega" hoặc "gmax" (hoặc "gigantamax")
       return !name.includes("mega") && !name.includes("gmax") && !name.includes("gigantamax");
     });
-
     setModalResults(filteredResults);
     setIsSearching(false);
   };
 
   const selectPokemonFromModal = async (pokemonName: string) => {
     setIsSearching(true);
-
-    // Ưu tiên dữ liệu local - nhưng chỉ nếu có moves data
     const localData = getPokemonByName(pokemonName);
     if (localData && localData.moves && localData.moves.length > 0) {
       setTeam([...team, { ...localData, selectedMoves: [], selectedTeraType: null, uuid: uuidv4() }]);
@@ -255,10 +319,7 @@ export default function TeamBuilderPage() {
       setIsSearching(false);
       return;
     }
-
-    // Fallback: gọi PokeAPI để lấy moves
     const fullData = await getPokemonDetails(pokemonName);
-
     if (fullData) {
       setTeam([...team, { ...fullData, selectedMoves: [], selectedTeraType: null, uuid: uuidv4() }]);
       toast.success(`Added ${fullData.name}!`);
@@ -269,8 +330,7 @@ export default function TeamBuilderPage() {
     setIsSearching(false);
   };
 
-  // --- SUB-COMPONENT: STAT BAR ---
-  const StatBar = ({ label, value, max = 255, color = "bg-blue-500" }: any) => (
+  const StatBar = ({ label, value, max = 255, color = "bg-blue-500" }: { label: string, value: number, max?: number, color?: string }) => (
     <div className="flex items-center gap-2 text-[10px] font-mono mb-1">
       <span className="w-8 font-bold text-slate-400 uppercase">{label}</span>
       <div className="flex-grow h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -293,15 +353,16 @@ export default function TeamBuilderPage() {
         </div>
 
         <div className="flex-grow overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-          {isLoadingTeams ? (
+          {/* Kiểm tra isDataLoaded thay vì isLoading cục bộ */}
+          {!isDataLoaded ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-500">
               <Loader2 className="animate-spin mb-3 text-blue-500" size={32} />
               <span className="text-sm">Loading...</span>
             </div>
-          ) : savedTeams.length === 0 ? (
+          ) : mySavedTeam.length === 0 ? (
             <div className="text-center text-slate-500 py-8 text-sm">No teams saved yet.</div>
           ) : (
-            savedTeams.map((t) => (
+            mySavedTeam.map((t) => (
               <div
                 key={t.id}
                 onClick={() => loadTeamToEdit(t)}
@@ -309,8 +370,8 @@ export default function TeamBuilderPage() {
               >
                 <div className="font-bold text-sm mb-1 truncate pr-6 text-slate-200">{t.name}</div>
                 <div className="flex -space-x-2">
-                  {t.pokemons.slice(0, 6).map((p: any) => (
-                    <img key={p.id} src={p.spriteUrl} className="w-8 h-8 rounded-full bg-slate-700 border border-slate-900" />
+                  {(t.pokemons || []).slice(0, 6).map((p: any) => (
+                    <img key={p.id} src={p.spriteUrl} className="w-8 h-8 rounded-full bg-slate-700 border border-slate-900" alt={p.name} />
                   ))}
                 </div>
                 <button onClick={(e) => deleteTeam(t.id, e)} className="absolute top-2 right-2 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
@@ -352,7 +413,7 @@ export default function TeamBuilderPage() {
           </div>
         </div>
 
-        {/* --- TEAM GRID (GIAO DIỆN MỚI) --- */}
+        {/* --- TEAM GRID --- */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pb-20">
           {team.length === 0 && (
             <div className="xl:col-span-2 h-64 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center justify-center text-slate-500 gap-4">
@@ -375,20 +436,19 @@ export default function TeamBuilderPage() {
                       bg-gradient-to-br ${gradientClass}
                     `}
               >
-                {/* Delete Button */}
                 <button onClick={() => removeFromTeam(member.uuid)} className="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors bg-black/20 p-1.5 rounded-full z-10">
                   <Trash2 size={18} />
                 </button>
 
-                {/* TOP SECTION: INFO & STATS */}
                 <div className="flex gap-4">
-                  {/* Sprite & Type */}
+                  {/* Sprite & Info */}
                   <div className="flex flex-col items-center justify-center w-32 shrink-0">
                     <div className="relative w-28 h-28">
                       <div className="absolute inset-0 bg-white/10 blur-2xl rounded-full"></div>
                       <img
                         src={member.sprite}
                         className="relative w-full h-full pixelated object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300"
+                        alt={member.name}
                       />
                     </div>
                     <h3 className="font-black text-xl text-white capitalize drop-shadow-md text-center leading-tight mb-2">
@@ -404,34 +464,55 @@ export default function TeamBuilderPage() {
                         <Sparkles size={12} className="text-cyan-400" />
                         <span className="text-[9px] font-bold text-cyan-300">TERA TYPE:</span>
                       </div>
-                      <div className="relative group">
-                        <button className="w-full bg-cyan-900/30 border border-cyan-600/50 hover:border-cyan-500 rounded-lg px-2 py-1 text-[11px] font-bold text-cyan-300 flex items-center justify-between transition-all">
+                      
+                      <div className="relative">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenTeraDropdownId(openTeraDropdownId === member.uuid ? null : member.uuid);
+                          }}
+                          className={`w-full bg-cyan-900/30 border rounded-lg px-2 py-1 text-[11px] font-bold text-cyan-300 flex items-center justify-between transition-all
+                            ${openTeraDropdownId === member.uuid ? 'border-cyan-500 ring-1 ring-cyan-500' : 'border-cyan-600/50 hover:border-cyan-500'}
+                          `}
+                        >
                           <span>{member.selectedTeraType ? member.selectedTeraType.toUpperCase() : 'Select'}</span>
-                          <ChevronDown size={12} />
+                          <ChevronDown size={12} className={`transition-transform ${openTeraDropdownId === member.uuid ? 'rotate-180' : ''}`} />
                         </button>
 
-                        {/* Dropdown Menu */}
-                        <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 hidden group-hover:grid grid-cols-3 gap-1 p-2 w-48">
-                          {ALL_TYPES.map((type) => (
-                            <button
-                              key={type}
-                              onClick={() => {
-                                setTeam(team.map(m =>
-                                  m.uuid === member.uuid ? { ...m, selectedTeraType: type } : m
-                                ));
+                        {openTeraDropdownId === member.uuid && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-40 cursor-default" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenTeraDropdownId(null);
                               }}
-                              className={`py-1 px-1.5 rounded text-[10px] font-bold border transition-all ${member.selectedTeraType === type
-                                  ? `border-cyan-500 bg-cyan-500/30 text-cyan-300`
-                                  : `border-slate-600 bg-slate-700/30 text-slate-300 hover:border-cyan-600`
-                                }`}
-                            >
-
-                              <TypeBadge type={type} className="text-[10px] px-1 py-0.5 w-full justify-center">
-                                {type.slice(0, 3)}
-                              </TypeBadge>
-                            </button>
-                          ))}
-                        </div>
+                            />
+                            
+                            <div className="absolute top-full left-0 right-0 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 grid grid-cols-3 gap-1 p-2 w-48 animate-in fade-in zoom-in-95 duration-200">
+                              {ALL_TYPES.map((type) => (
+                                <button
+                                  key={type}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTeam(team.map(m =>
+                                      m.uuid === member.uuid ? { ...m, selectedTeraType: type } : m
+                                    ));
+                                    setOpenTeraDropdownId(null);
+                                  }}
+                                  className={`py-1 px-1.5 rounded text-[10px] font-bold border transition-all ${member.selectedTeraType === type
+                                      ? `border-cyan-500 bg-cyan-500/30 text-cyan-300`
+                                      : `border-slate-600 bg-slate-700/30 text-slate-300 hover:border-cyan-600`
+                                    }`}
+                                >
+                                  <TypeBadge type={type} className="text-[10px] px-1 py-0.5 w-full justify-center">
+                                    {type.slice(0, 3)}
+                                  </TypeBadge>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -450,7 +531,6 @@ export default function TeamBuilderPage() {
 
                 {/* BOTTOM SECTION: MOVES */}
                 <div className="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
-                  {/* Selected Moves */}
                   <div className="flex flex-wrap gap-2 mb-3 min-h-[30px]">
                     {member.selectedMoves.length === 0 && <span className="text-xs text-slate-500 italic">No moves selected (Max 4)</span>}
                     {member.selectedMoves.map(m => {
@@ -464,7 +544,6 @@ export default function TeamBuilderPage() {
                     })}
                   </div>
 
-                  {/* Edit Moves Accordion */}
                   <div className="border-t border-white/10 pt-2">
                     {member.moves.length > 0 ? (
                       <details className="group">
@@ -481,18 +560,13 @@ export default function TeamBuilderPage() {
                                   <input type="checkbox" checked={isSelected} onChange={() => toggleMove(member.uuid, move.name)} className="rounded border-slate-500 bg-slate-900 accent-blue-500 w-3 h-3 shrink-0" />
                                   <div className="flex flex-col overflow-hidden">
                                     <span className={`text-[11px] font-bold capitalize truncate ${isSelected ? 'text-white' : 'text-slate-300'}`}>{move.name.replace(/-/g, " ")}</span>
-                                    {/* HIỂN THỊ POWER / ACCURACY NẾU CÓ */}
                                     <span className="text-[9px] text-slate-500 font-mono">
                                       {move.category === 'status' ? '-' : `PWR:${move.power || '-'}`} | ACC:{move.accuracy || '-'}%
                                     </span>
                                   </div>
                                 </div>
-
                                 <div className="flex flex-col gap-1 items-end ml-1">
-                                  {/* HIỂN THỊ CATEGORY BADGE */}
                                   <CategoryBadge category={move.category} />
-
-                                  {/* Type Badge cũ */}
                                   <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded text-white ${badgeColor} w-[45px] text-center`}>
                                     {move.type.slice(0, 3)}
                                   </span>
@@ -537,7 +611,7 @@ export default function TeamBuilderPage() {
               ) : (
                 modalResults.map((p) => (
                   <button key={p.name} onClick={() => selectPokemonFromModal(p.name)} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all group text-left">
-                    <img src={p.sprite} className="w-12 h-12 pixelated bg-slate-900 rounded-lg border border-slate-800 group-hover:scale-110 transition-transform" />
+                    <img src={p.sprite} className="w-12 h-12 pixelated bg-slate-900 rounded-lg border border-slate-800 group-hover:scale-110 transition-transform" alt={p.name} />
                     <div className="flex-grow">
                       <h4 className="font-bold text-white capitalize text-lg">{p.name}</h4>
                       <div className="flex gap-1">{p.types.map((t: string) => <TypeBadge key={t} type={t} className="text-[10px] py-0.5" />)}</div>

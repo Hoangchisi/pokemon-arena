@@ -170,31 +170,50 @@ export const useBattleStore = create<BattleState>((set, get) => ({
 
   applyTerastallize: (side, teraType) => {
     set((state) => {
+      // 1. Xác định phe
       const teamKey = side === 'player' ? 'myTeam' : 'enemyTeam';
       const activeIdx = side === 'player' ? state.activePlayerIndex : state.activeEnemyIndex;
+
+      // 2. Clone dữ liệu để không mutate trực tiếp state cũ
       const newTeam = [...state[teamKey]];
       const pokemon = { ...newTeam[activeIdx] };
 
-      const terastallized = handleTerastallize(pokemon, teraType);
-      Object.assign(pokemon, terastallized);
+      // 3. Xử lý logic thay đổi chỉ số/hệ (Giả sử bạn có hàm helper handleTerastallize)
+      // Nếu chưa có hàm này, bạn cần viết logic thay đổi type ở đây
+      if (typeof handleTerastallize === 'function') {
+        const terastallized = handleTerastallize(pokemon, teraType);
+        Object.assign(pokemon, terastallized);
+      } else {
+        // Logic fallback nếu không có hàm helper: Đổi hệ trực tiếp
+        pokemon.types = [teraType];
+      }
 
+      // 4. Cập nhật thông tin Tera trên Pokemon
       pokemon.terastallize = {
         isTerastallized: true,
         teraType: teraType
       };
 
       pokemon.hasUsedMechanic = true;
-
       newTeam[activeIdx] = pokemon;
-      let newMechanics = { ...state.playerUsedMechanics };
+
+      // 5. CHUẨN BỊ STATE TRẢ VỀ (QUAN TRỌNG)
+      const updates: any = {
+        [teamKey]: newTeam
+      };
+
+      // 6. Cập nhật cờ Global (Fix lỗi ở đây)
       if (side === 'player') {
-        newMechanics.tera = true;
+        updates.playerUsedMechanics = {
+          ...state.playerUsedMechanics,
+          tera: true
+        };
+      } else {
+        // BẮT BUỘC: Đánh dấu Enemy đã dùng mechanic
+        updates.enemyUsedMechanic = true;
       }
 
-      return {
-        [teamKey]: newTeam,
-        playerUsedMechanics: newMechanics, // Cập nhật object mới
-      };
+      return updates;
     });
   },
 
@@ -250,35 +269,50 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       const isLastPokemon = eIndex === enemyTeam.length - 1;
 
       if (isLastPokemon) {
-        const enemyData = getPokemonByName(currentEnemy.name);
-        const forms = enemyData?.forms;
+        let aiAction: 'mega' | 'gmax' | 'tera' | null = null;
+        let targetTeraType: string | null = null;
 
-        if (forms) {
-          let aiAction: 'mega' | 'gmax' | null = null;
+        // 1. Ưu tiên lấy từ config Ace Mechanic (Map từ database/npc.ts)
+        if (currentEnemy.aceMechanic) {
+          aiAction = currentEnemy.aceMechanic;
+          // Nếu là Tera, lấy hệ Tera đã chọn hoặc mặc định là hệ chính
+          if (aiAction === 'tera') {
+            targetTeraType = currentEnemy.selectedTeraType || currentEnemy.types[0];
+          }
+        }
+        // 2. Fallback: Tự động đoán nếu không có config
+        else {
+          const enemyData = getPokemonByName(currentEnemy.name);
+          const forms = enemyData?.forms;
+          if (forms) {
+            if (forms.gmax) aiAction = 'gmax';
+            else if (forms.mega) aiAction = 'mega';
+          }
+        }
 
-          if (currentEnemy.aceMechanic) {
-            aiAction = currentEnemy.aceMechanic;
-          } else {
-            // Fallback: Tự động phát hiện nếu không có cài đặt
-            const enemyData = getPokemonByName(currentEnemy.name);
-            const forms = enemyData?.forms;
-            if (forms) {
-              if (forms.gmax) aiAction = 'gmax';
-              else if (forms.mega) aiAction = 'mega';
-            }
+        // 3. Thực thi hành động
+        if (aiAction) {
+          let actionLog = "";
+
+          if (aiAction === 'tera' && targetTeraType) {
+            // GỌI HÀM TERA CHO ENEMY
+            get().applyTerastallize('enemy', targetTeraType);
+            actionLog = `Enemy's Ace ${currentEnemy.name} Terastallized into ${targetTeraType} type!`;
+          }
+          else if (aiAction === 'mega' || aiAction === 'gmax') {
+            // GỌI HÀM TRANSFORM
+            get().applyTransformation('enemy', aiAction);
+            const actionName = aiAction === 'gmax' ? 'Gigantamaxed' : 'Mega Evolved';
+            actionLog = `Enemy's Ace ${currentEnemy.name} ${actionName}!`;
           }
 
-          if (aiAction) {
-            get().applyTransformation('enemy', aiAction);
-
-            const actionName = aiAction === 'gmax' ? 'Gigantamaxed' : 'Mega Evolved';
-
-            // Cập nhật log ngay lập tức
+          // Cập nhật log và chặn dùng lại
+          if (actionLog) {
             set(s => ({
-              logs: [...s.logs, `Enemy's Ace ${currentEnemy.name} ${actionName}!`],
+              logs: [...s.logs, actionLog],
               enemyUsedMechanic: true
             }));
-
+            // Delay để người chơi kịp nhìn
             await new Promise(r => setTimeout(r, 1000));
           }
         }

@@ -5,30 +5,36 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 
 // --- VALIDATION SCHEMA ---
-// Dùng để kiểm tra dữ liệu đầu vào khi Lưu Team
+// Cho phép linh hoạt hơn (optional/nullable) để tránh lỗi 422 không đáng có
 const createTeamSchema = z.object({
   name: z.string().min(1, "Team name is required"),
   pokemons: z.array(z.object({
-    pokedexId: z.number(),
+    pokedexId: z.number().or(z.string().transform(Number)), // Chấp nhận cả string ID rồi convert
     name: z.string(),
-    move1: z.string(),
-    move2: z.string().nullable(),
-    move3: z.string().nullable(),
-    move4: z.string().nullable(),
+    
+    // Moves: Cho phép string, null, hoặc undefined
+    move1: z.string().nullable().optional(),
+    move2: z.string().nullable().optional(),
+    move3: z.string().nullable().optional(),
+    move4: z.string().nullable().optional(),
+    
+    // Stats: Bắt buộc
     hp: z.number(),
     attack: z.number(),
     defense: z.number(),
     spAtk: z.number(),
     spDef: z.number(),
     speed: z.number(),
+    
+    // Metadata
     types: z.array(z.string()),
-    spriteUrl: z.string().nullable(),
-    teraType: z.string().nullable(),
+    spriteUrl: z.string().nullable().optional(),
+    teraType: z.string().nullable().optional(),
     order: z.number()
   })).max(6, "Maximum 6 Pokemons allowed")
 });
 
-// --- 1. POST: Dùng cho Team Builder (Lưu Team) ---
+// --- 1. POST: Dùng cho Team Builder (Lưu Team Mới) ---
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -39,43 +45,65 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     
-    // Validate dữ liệu
-    const { name, pokemons } = createTeamSchema.parse(body);
+    // 1. Validate dữ liệu đầu vào
+    const parseResult = createTeamSchema.safeParse(body);
+    
+    if (!parseResult.success) {
+      console.error("[VALIDATION_ERROR]", parseResult.error);
+      return new NextResponse("Invalid request data", { status: 422 });
+    }
 
-    // Lưu vào Database (Transaction: Tạo Team -> Tạo các Pokemon con)
+    const { name, pokemons } = parseResult.data;
+
+    // 2. Lưu vào Database
+    // Sử dụng Nested Write để tạo Team và Pokemon cùng lúc
     const team = await prisma.team.create({
       data: {
         name,
-        userId: session.user.id,
+        // Liên kết với User
+        // LƯU Ý: Nếu schema bạn dùng quan hệ 'user: { connect: ... }' thì sửa lại dòng dưới
+        // Ở đây giả định schema có trường 'userId'
+        userId: session.user.id, 
+        
+        // Tạo danh sách Pokemon con (Relation: SavedPokemon)
         pokemons: {
           create: pokemons.map((p) => ({
-            pokedexId: p.pokedexId,
+            pokedexId: typeof p.pokedexId === 'string' ? parseInt(p.pokedexId) : p.pokedexId,
             name: p.name,
-            move1: p.move1,
-            move2: p.move2,
-            move3: p.move3,
-            move4: p.move4,
+            
+            // Stats
             hp: p.hp,
             attack: p.attack,
             defense: p.defense,
             spAtk: p.spAtk,
             spDef: p.spDef,
             speed: p.speed,
+            
+            // Info
             types: p.types,
-            spriteUrl: p.spriteUrl,
-            teraType: p.teraType,
-            order: p.order
+            spriteUrl: p.spriteUrl || "", // Fallback chuỗi rỗng nếu null
+            order: p.order,
+            
+            // Moves & Mechanics (Xử lý null an toàn)
+            move1: p.move1 || "tackle",
+            move2: p.move2 || null,
+            move3: p.move3 || null,
+            move4: p.move4 || null,
+            teraType: p.teraType || null,
           }))
         }
-      }
+      },
+      // QUAN TRỌNG: Trả về kèm danh sách pokemon để Frontend hiển thị ngay
+      include: {
+        pokemons: {
+            orderBy: { order: 'asc' }
+        }
+      } 
     });
 
     return NextResponse.json(team);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return new NextResponse("Invalid request data", { status: 422 });
-    }
-    console.log("[TEAMS_POST]", error);
+    console.error("[TEAMS_POST]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
@@ -107,7 +135,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(teams);
   } catch (error) {
-    console.log("[TEAMS_GET]", error);
+    console.error("[TEAMS_GET]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }

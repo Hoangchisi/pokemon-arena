@@ -93,6 +93,7 @@ export const mapToBattlePokemon = async (
       spDef: source.stats?.spDef || source.spDef,
       speed: source.stats?.speed || source.speed,
     },
+    aceMechanic: source.aceMechanic,
 
     moves: moveObjects, // Đã có đầy đủ data: power, category...
     status: null,
