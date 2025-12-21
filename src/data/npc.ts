@@ -197,7 +197,7 @@ export const LANCE_TEAM: NPCPokemon[] = [
     pokedexId: 130,
     name: "gyarados",
     types: ["water", "flying"],
-    spriteUrl: getSprite(130),
+    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/130.png",
     stats: { hp: 170, attack: 177, defense: 99, spAtk: 80, spDef: 120, speed: 101 },
     selectedMoves: ["waterfall", "bounce", "dragon-dance", "ice-fang"]
   },
