@@ -356,12 +356,240 @@ export const DIANTHA_TEAM: NPCPokemon[] = [
     aceMechanic: 'mega' // <--- Gán Mega
   }
 ];
+// ... (Các import và code cũ giữ nguyên)
 
+// =====================================================================
+// 7. BLUE (Kanto Champion/Rival) - Ace: Pidgeot -> Mega
+// =====================================================================
+export const BLUE_TEAM: NPCPokemon[] = [
+  {
+    pokedexId: 103,
+    name: "exeggutor",
+    types: ["grass", "psychic"],
+    spriteUrl: getSprite(103),
+    stats: { hp: 202, attack: 115, defense: 105, spAtk: 145, spDef: 85, speed: 75 },
+    selectedMoves: ["leaf-storm", "psychic", "sludge-bomb", "giga-drain"]
+  },
+  {
+    pokedexId: 59,
+    name: "arcanine",
+    types: ["fire"],
+    spriteUrl: getSprite(59),
+    stats: { hp: 197, attack: 130, defense: 100, spAtk: 120, spDef: 100, speed: 115 },
+    selectedMoves: ["flare-blitz", "extreme-speed", "wild-charge", "crunch"]
+  },
+  {
+    pokedexId: 112,
+    name: "rhydon",
+    types: ["ground", "rock"],
+    spriteUrl: getSprite(112),
+    stats: { hp: 212, attack: 150, defense: 140, spAtk: 65, spDef: 65, speed: 60 },
+    selectedMoves: ["earthquake", "stone-edge", "megahorn", "hammer-arm"]
+  },
+  {
+    pokedexId: 130,
+    name: "gyarados",
+    types: ["water", "flying"],
+    spriteUrl: getSprite(130),
+    stats: { hp: 202, attack: 145, defense: 99, spAtk: 80, spDef: 120, speed: 101 },
+    selectedMoves: ["waterfall", "bounce", "dragon-dance", "crunch"]
+  },
+  {
+    pokedexId: 65,
+    name: "alakazam",
+    types: ["psychic"],
+    spriteUrl: getSprite(65),
+    stats: { hp: 162, attack: 70, defense: 65, spAtk: 155, spDef: 115, speed: 140 },
+    selectedMoves: ["psychic", "shadow-ball", "focus-blast", "dazzling-gleam"]
+  },
+  // ACE: Pidgeot (Sẽ Mega)
+  {
+    pokedexId: 18,
+    name: "pidgeot",
+    types: ["normal", "flying"],
+    spriteUrl: getSprite(18),
+    stats: { hp: 190, attack: 100, defense: 95, spAtk: 90, spDef: 90, speed: 121 },
+    selectedMoves: ["hurricane", "heat-wave", "u-turn", "roost"],
+    aceMechanic: 'mega' // Mega Pidgeot (No Guard Hurricane)
+  }
+];
+
+// =====================================================================
+// 8. IRIS (Unova Champion) - Ace: Haxorus -> Tera Dragon
+// =====================================================================
+export const IRIS_TEAM: NPCPokemon[] = [
+  {
+    pokedexId: 635,
+    name: "hydreigon",
+    types: ["dark", "dragon"],
+    spriteUrl: getSprite(635),
+    stats: { hp: 199, attack: 125, defense: 110, spAtk: 145, spDef: 110, speed: 118 },
+    selectedMoves: ["draco-meteor", "dark-pulse", "fire-blast", "flash-cannon"]
+  },
+  {
+    pokedexId: 621,
+    name: "druddigon",
+    types: ["dragon"],
+    spriteUrl: getSprite(621),
+    stats: { hp: 184, attack: 135, defense: 110, spAtk: 80, spDef: 110, speed: 68 },
+    selectedMoves: ["outrage", "sucker-punch", "fire-punch", "glare"]
+  },
+  {
+    pokedexId: 306,
+    name: "aggron",
+    types: ["steel", "rock"],
+    spriteUrl: getSprite(306),
+    stats: { hp: 177, attack: 130, defense: 200, spAtk: 80, spDef: 80, speed: 70 },
+    selectedMoves: ["heavy-slam", "stone-edge", "earthquake", "avalanche"]
+  },
+  {
+    pokedexId: 567,
+    name: "archeops",
+    types: ["rock", "flying"],
+    spriteUrl: getSprite(567),
+    stats: { hp: 182, attack: 160, defense: 85, spAtk: 132, spDef: 85, speed: 130 },
+    selectedMoves: ["acrobatics", "stone-edge", "earthquake", "u-turn"]
+  },
+  {
+    pokedexId: 131,
+    name: "lapras",
+    types: ["water", "ice"],
+    spriteUrl: getSprite(131),
+    stats: { hp: 237, attack: 105, defense: 100, spAtk: 105, spDef: 115, speed: 80 },
+    selectedMoves: ["ice-beam", "thunderbolt", "hydro-pump", "freeze-dry"]
+  },
+  // ACE: Haxorus (Tera Dragon)
+  {
+    pokedexId: 612,
+    name: "haxorus",
+    types: ["dragon"],
+    spriteUrl: getSprite(612),
+    stats: { hp: 183, attack: 167, defense: 110, spAtk: 80, spDef: 90, speed: 117 },
+    selectedMoves: ["outrage", "earthquake", "iron-tail", "dragon-dance"],
+  }
+];
+
+// =====================================================================
+// 9. ALDER (Unova Champion BW) - Ace: Volcarona -> Tera Bug
+// =====================================================================
+export const ALDER_TEAM: NPCPokemon[] = [
+  {
+    pokedexId: 617,
+    name: "accelgor",
+    types: ["bug"],
+    spriteUrl: getSprite(617),
+    stats: { hp: 187, attack: 90, defense: 60, spAtk: 120, spDef: 80, speed: 165 },
+    selectedMoves: ["bug-buzz", "focus-blast", "energy-ball", "sludge-bomb"]
+  },
+  {
+    pokedexId: 626,
+    name: "bouffalant",
+    types: ["normal"],
+    spriteUrl: getSprite(626),
+    stats: { hp: 202, attack: 130, defense: 115, spAtk: 60, spDef: 115, speed: 75 },
+    selectedMoves: ["head-charge", "earthquake", "stone-edge", "megahorn"]
+  },
+  {
+    pokedexId: 589,
+    name: "escavalier",
+    types: ["bug", "steel"],
+    spriteUrl: getSprite(589),
+    stats: { hp: 177, attack: 155, defense: 125, spAtk: 80, spDef: 125, speed: 40 },
+    selectedMoves: ["megahorn", "iron-head", "swords-dance", "drill-run"]
+  },
+  {
+    pokedexId: 584,
+    name: "vanilluxe",
+    types: ["ice"],
+    spriteUrl: getSprite(584),
+    stats: { hp: 178, attack: 115, defense: 105, spAtk: 130, spDef: 115, speed: 99 },
+    selectedMoves: ["blizzard", "flash-cannon", "freeze-dry", "ice-shard"]
+  },
+  {
+    pokedexId: 621,
+    name: "druddigon",
+    types: ["dragon"],
+    spriteUrl: getSprite(621),
+    stats: { hp: 184, attack: 135, defense: 110, spAtk: 80, spDef: 110, speed: 68 },
+    selectedMoves: ["superpower", "outrage", "gunk-shot", "fire-fang"]
+  },
+  // ACE: Volcarona (Tera Bug)
+  {
+    pokedexId: 637,
+    name: "volcarona",
+    types: ["bug", "fire"],
+    spriteUrl: getSprite(637),
+    stats: { hp: 192, attack: 80, defense: 85, spAtk: 155, spDef: 125, speed: 120 },
+    selectedMoves: ["quiver-dance", "fiery-dance", "bug-buzz", "psychic"],
+  }
+];
+
+// =====================================================================
+// 10. GEETA (Paldea Champion) - Ace: Glimmora -> Tera Rock
+// =====================================================================
+export const GEETA_TEAM: NPCPokemon[] = [
+  {
+    pokedexId: 956,
+    name: "espathra",
+    types: ["psychic"],
+    spriteUrl: getSprite(956),
+    stats: { hp: 202, attack: 80, defense: 80, spAtk: 121, spDef: 80, speed: 125 },
+    selectedMoves: ["lumina-crash", "dazzling-gleam", "shadow-ball", "protect"]
+  },
+  {
+    pokedexId: 673,
+    name: "gogoat",
+    types: ["grass"],
+    spriteUrl: getSprite(673),
+    stats: { hp: 230, attack: 120, defense: 82, spAtk: 117, spDef: 101, speed: 88 },
+    selectedMoves: ["horn-leech", "zen-headbutt", "earthquake", "bulk-up"]
+  },
+  {
+    pokedexId: 976,
+    name: "veluza",
+    types: ["water", "psychic"],
+    spriteUrl: getSprite(976),
+    stats: { hp: 197, attack: 122, defense: 93, spAtk: 98, spDef: 85, speed: 90 },
+    selectedMoves: ["aqua-cutter", "psycho-cut", "night-slash", "fillet-away"]
+  },
+  {
+    pokedexId: 713,
+    name: "avalugg",
+    types: ["ice"],
+    spriteUrl: getSprite(713),
+    stats: { hp: 202, attack: 137, defense: 204, spAtk: 64, spDef: 66, speed: 48 },
+    selectedMoves: ["avalanche", "body-press", "earthquake", "recover"]
+  },
+  {
+    pokedexId: 983,
+    name: "kingambit",
+    types: ["dark", "steel"],
+    spriteUrl: getSprite(983),
+    stats: { hp: 207, attack: 155, defense: 140, spAtk: 80, spDef: 105, speed: 70 },
+    selectedMoves: ["kowtow-cleave", "iron-head", "sucker-punch", "swords-dance"]
+  },
+
+  {
+    pokedexId: 970,
+    name: "glimmora",
+    types: ["rock", "poison"],
+    spriteUrl: getSprite(970),
+    stats: { hp: 190, attack: 75, defense: 110, spAtk: 150, spDef: 101, speed: 106 },
+    selectedMoves: ["tera-blast", "sludge-wave", "power-gem", "earth-power"],
+  }
+];
+
+// Cập nhật lại Object export cuối file
 export const NPC_DATA = {
-  lance: LANCE_TEAM,
-  steven: STEVEN_TEAM,
-  diantha: DIANTHA_TEAM,
   cynthia: CYNTHIA_TEAM,
+  red: RED_TEAM,
+  steven: STEVEN_TEAM,
+  lance: LANCE_TEAM,
   leon: LEON_TEAM,
-  red: RED_TEAM
+  diantha: DIANTHA_TEAM,
+  // Thêm mới:
+  blue: BLUE_TEAM,
+  iris: IRIS_TEAM,
+  alder: ALDER_TEAM,
+  geeta: GEETA_TEAM
 };
