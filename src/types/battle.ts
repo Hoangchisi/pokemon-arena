@@ -85,6 +85,7 @@ export interface BattlePokemon {
   hasUsedMechanic?: boolean; // Đã sử dụng Transformation hoặc Terastallize trong trận chưa
 
   aceMechanic?: 'mega' | 'gmax' | 'tera'; // Cơ chế đặc biệt của Ace Pokemon
+  isShiny: boolean; // Có phải Shiny không
 }
 
 // (Optional) Định nghĩa kết quả của một lượt tính toán damage

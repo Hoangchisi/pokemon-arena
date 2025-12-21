@@ -118,7 +118,7 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       const newTeam = [...state[teamKey]];
       const pokemon = { ...newTeam[activeIdx] };
       const originalName = pokemon.name;
-
+      
       if (formType === 'mega') {
         const transformed = handleMegaEvolution(pokemon);
         Object.assign(pokemon, transformed);

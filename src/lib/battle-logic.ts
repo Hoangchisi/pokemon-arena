@@ -102,7 +102,23 @@ export const handleMegaEvolution = (pokemon: BattlePokemon): BattlePokemon => {
   // Lấy sprite từ pokedex data
   const pokemonData = getPokemonByName(pokemon.name);
   const megaForm = pokemonData?.forms?.mega;
-  const megaSprite = megaForm?.sprite || pokemon.sprite.replace(/\.(png|jpg|gif)$/i, '') + '-mega.png';
+  // 2. Xử lý Sprite (Logic mới cho cấu trúc data của bạn)
+  const isShiny = pokemon.sprite.includes("/shiny/"); // Check xem con hiện tại có phải shiny không
+  let megaSprite = megaForm?.sprite || pokemon.sprite.replace(/\.(png|jpg|gif)$/i, '') + '-mega.png'; // Mặc định lấy ảnh Mega thường trong data
+
+  // Nếu con hiện tại là Shiny, ta cần biến ảnh Mega thành Shiny
+  if (isShiny && megaForm?.sprite) {
+    // Regex để lấy ID từ URL: khớp các số nằm giữa "/" và ".png"
+    // Ví dụ: .../pokemon/10033.png -> Lấy được "10033"
+    const idMatch = megaForm?.sprite.match(/\/(\d+)\.png$/);
+    
+    if (idMatch && idMatch[1]) {
+      const megaId = idMatch[1];
+      // Tạo URL Shiny thủ công
+      megaSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${megaId}.png`;
+    }
+  }
+  // const megaSprite = megaForm?.sprite || pokemon.sprite.replace(/\.(png|jpg|gif)$/i, '') + '-mega.png';
   // Lấy Base Stats gốc (OldBaseStat) từ data
   const oldBaseStats = pokemonData?.stats || pokemon.stats;
 

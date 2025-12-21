@@ -71,6 +71,8 @@ export const mapToBattlePokemon = async (
     moveNames.map((name) => fetchMoveData(name))
   );
 
+  const isShiny = source.isShiny || false;
+
   return {
     id: uuidv4(), // Tạo ID mới cho instance trong trận
     pokedexId: source.pokedexId || source.id,
@@ -97,6 +99,7 @@ export const mapToBattlePokemon = async (
 
     moves: moveObjects, // Đã có đầy đủ data: power, category...
     status: null,
+    isShiny: isShiny,
     isFlinched: false
   };
 };

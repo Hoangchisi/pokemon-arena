@@ -16,10 +16,14 @@ export interface NPCPokemon {
   // --- THÊM TRƯỜNG NÀY ---
   // Định nghĩa cụ thể Ace này sẽ dùng gì: 'mega', 'gmax', hoặc 'tera'
   aceMechanic?: 'mega' | 'gmax' | 'tera'; 
+  isShiny?: boolean;
 }
 
 const getSprite = (id: number) => 
   `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+
+const getShinySprite = (id: number) => 
+  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`;
 
 // =====================================================================
 // 1. CYNTHIA - Ace: Garchomp -> Mega
@@ -182,10 +186,11 @@ export const STEVEN_TEAM: NPCPokemon[] = [
     pokedexId: 376,
     name: "metagross",
     types: ["steel", "psychic"],
-    spriteUrl: getSprite(376),
+    spriteUrl: getShinySprite(376),
     stats: { hp: 155, attack: 187, defense: 150, spAtk: 115, spDef: 110, speed: 90 },
     selectedMoves: ["meteor-mash", "zen-headbutt", "earthquake", "bullet-punch"],
-    aceMechanic: 'mega' // <--- Gán Mega
+    aceMechanic: 'mega', // <--- Gán Mega
+    isShiny: true // <--- Gán Shiny
   }
 ];
 
@@ -197,9 +202,10 @@ export const LANCE_TEAM: NPCPokemon[] = [
     pokedexId: 130,
     name: "gyarados",
     types: ["water", "flying"],
-    spriteUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/130.png",
+    spriteUrl: getShinySprite(130),
     stats: { hp: 170, attack: 177, defense: 99, spAtk: 80, spDef: 120, speed: 101 },
-    selectedMoves: ["waterfall", "bounce", "dragon-dance", "ice-fang"]
+    selectedMoves: ["waterfall", "bounce", "dragon-dance", "ice-fang"],
+    isShiny: true // <--- Gán Shiny
   },
   {
     pokedexId: 142,
