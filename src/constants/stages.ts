@@ -6,9 +6,9 @@ export const STAGE_ORDER = [
   'alder',   // Mới
   'diantha',
   'iris',    // Mới
+  'geeta',   // Mới
   'cynthia',
   'leon',
-  'geeta',   // Mới
   'blue',    // Mới
   'red'
 ] as const;

@@ -1,31 +1,32 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth"; // Đảm bảo đường dẫn này đúng với file auth của bạn
-import { prisma } from "@/lib/db"; // <--- ĐÃ SỬA: Import từ file lib/db.ts của bạn
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
+// --- GET: Lấy tiến độ hiện tại ---
 export async function GET(req: Request) {
   try {
-    // 1. Lấy session người dùng
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
+    if (!session || !session.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const userEmail = session.user.email;
+    // Ưu tiên dùng ID để tìm kiếm (nhanh & chính xác hơn email)
+    // Nếu NextAuth config chưa trả về id, fallback sang email
+    const whereCondition = session.user.id 
+      ? { id: session.user.id } 
+      : { email: session.user.email! };
 
-    // 2. Truy vấn Database bằng Prisma từ lib/db.ts
     const user = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: whereCondition,
       select: { maxStageUnlocked: true }
     });
 
-    // Nếu chưa có dữ liệu, trả về 0
-    if (!user) {
-        return NextResponse.json({ maxStageUnlocked: 0 });
-    }
-
-    return NextResponse.json({ maxStageUnlocked: user.maxStageUnlocked });
+    // Nếu user chưa có (trường hợp hiếm) hoặc chưa có data, trả về 0
+    return NextResponse.json({ 
+      maxStageUnlocked: user?.maxStageUnlocked ?? 0 
+    });
 
   } catch (error) {
     console.error("[USER_PROGRESS_GET]", error);
@@ -33,48 +34,54 @@ export async function GET(req: Request) {
   }
 }
 
+// --- POST: Cập nhật tiến độ khi thắng ---
 export async function POST(req: Request) {
   try {
-    // 1. Xác thực
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.email) {
+    if (!session || !session.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const userEmail = session.user.email;
-
-    // 2. Lấy dữ liệu gửi lên
     const body = await req.json();
     const { stageUnlocked } = body;
 
+    // Validate dữ liệu đầu vào
     if (typeof stageUnlocked !== 'number') {
-      return new NextResponse("Invalid data", { status: 400 });
+      return new NextResponse("Invalid data: stageUnlocked must be a number", { status: 400 });
     }
 
-    // 3. Logic cập nhật DB
-    // Tìm user hiện tại
+    const whereCondition = session.user.id 
+      ? { id: session.user.id } 
+      : { email: session.user.email! };
+
+    // 1. Lấy tiến độ hiện tại trong DB
     const currentUser = await prisma.user.findUnique({
-       where: { email: userEmail }
+      where: whereCondition,
+      select: { maxStageUnlocked: true }
     });
 
     if (!currentUser) {
-        // Tùy logic: Nếu user không tồn tại trong DB dù đã có session
-        // Bạn có thể trả về lỗi 404 hoặc tự động tạo user mới tại đây
-        return new NextResponse("User not found in database", { status: 404 });
+       return new NextResponse("User not found", { status: 404 });
     }
 
-    // Chỉ cập nhật nếu tiến độ mới cao hơn cũ
+    // 2. Logic Cập nhật: Chỉ lưu nếu stage mới CAO HƠN stage cũ
+    // (Tránh trường hợp chơi lại màn 1 mà bị reset tiến độ về 1)
+    let finalStage = currentUser.maxStageUnlocked;
+
     if (stageUnlocked > currentUser.maxStageUnlocked) {
-        await prisma.user.update({
-            where: { email: userEmail },
-            data: { maxStageUnlocked: stageUnlocked }
-        });
+      const updatedUser = await prisma.user.update({
+        where: whereCondition,
+        data: { maxStageUnlocked: stageUnlocked },
+        select: { maxStageUnlocked: true }
+      });
+      finalStage = updatedUser.maxStageUnlocked;
     }
 
+    // Trả về kết quả mới nhất để Frontend cập nhật Store
     return NextResponse.json({ 
-        success: true, 
-        savedStage: Math.max(stageUnlocked, currentUser.maxStageUnlocked) 
+      success: true, 
+      maxStageUnlocked: finalStage 
     });
 
   } catch (error) {

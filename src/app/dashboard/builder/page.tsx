@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-hot-toast";
 import {
@@ -14,7 +15,7 @@ import { TypeBadge } from "@/components/ui/TypeBadge";
 // Import Store
 import { useUserStore } from "@/hooks/useUserStore";
 
-// ... (Các hằng số TYPE_GRADIENTS, TYPE_COLORS, ALL_TYPES giữ nguyên như cũ)
+// ... (Constants kept same as requested)
 const TYPE_GRADIENTS: Record<string, string> = {
   normal: "from-neutral-700/50 to-slate-900 border-neutral-600",
   fire: "from-orange-900/60 to-slate-900 border-orange-600",
@@ -52,84 +53,95 @@ const ALL_TYPES = [
 ];
 
 export default function TeamBuilderPage() {
-  // --- KẾT NỐI STORE (Thay thế cho state savedTeams cũ) ---
-  const { 
-    mySavedTeam,     // Danh sách team từ cache
-    fetchUserData,   // Hàm fetch thông minh (chỉ fetch nếu chưa có)
-    setSavedTeam,    // Hàm cập nhật cache thủ công
-    isDataLoaded     // Cờ kiểm tra đã load chưa
+  const { data: session } = useSession();
+
+  // --- STORE CONNECTION ---
+  const {
+    mySavedTeam,
+    fetchUserData,
+    setSavedTeam,
+    isDataLoaded
   } = useUserStore();
 
   // --- LOCAL STATES ---
   const [teamName, setTeamName] = useState("My New Team");
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
-
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Modal Search
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalQuery, setModalQuery] = useState("");
   const [modalResults, setModalResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Dropdown Logic
   const [openTeraDropdownId, setOpenTeraDropdownId] = useState<string | null>(null);
 
   // --- INITIALIZATION ---
   useEffect(() => {
-    // Gọi hàm này ngay khi vào trang.
-    // Nếu store đã có dữ liệu (từ trang Arena), nó sẽ dùng luôn cache -> KO LOAD LẠI
     fetchUserData();
   }, [fetchUserData]);
 
-  // --- LOGIC LOAD TEAM EDIT ---
-  // 2. Load 1 team để chỉnh sửa
+  // --- LOGIC: LOAD TEAM TO EDIT ---
   const loadTeamToEdit = async (savedTeam: any) => {
     setEditingTeamId(savedTeam.id);
     setTeamName(savedTeam.name);
 
-    // Bước 1: Map dữ liệu cơ bản để hiển thị NGAY LẬP TỨC
-    const mappedPokemons: TeamMember[] = savedTeam.pokemons.map((p: any) => ({
-      uuid: uuidv4(),
-      id: p.pokedexId, 
-      name: p.name, 
-      types: p.types, 
-      sprite: p.spriteUrl,
-      stats: {
-        hp: p.hp, attack: p.attack, defense: p.defense,
-        spAtk: p.spAtk, spDef: p.spDef, speed: p.stats?.speed || p.speed
-      },
-      moves: [], // Ban đầu để rỗng để render nhanh
-      // Lấy lại các move đã chọn từ DB
-      selectedMoves: [p.move1, p.move2, p.move3, p.move4].filter(Boolean),
-      // Lấy lại Tera Type (Ưu tiên từ DB, nếu không có thì null)
-      selectedTeraType: p.teraType || null, 
-    }));
+    // 1. Instant Map (Basic Info)
+    const mappedPokemons: TeamMember[] = savedTeam.pokemons.map((p: any) => {
+      // Validate Moves from DB
+      const dbMoves = [p.move1, p.move2, p.move3, p.move4];
+      const validSelectedMoves = dbMoves.filter((m) => m && m.trim() !== "");
+
+      return {
+        uuid: uuidv4(),
+        id: p.pokedexId,
+        name: p.name,
+        types: p.types,
+        sprite: p.spriteUrl,
+        stats: {
+          hp: p.hp, attack: p.attack, defense: p.defense,
+          spAtk: p.spAtk, spDef: p.spDef, speed: p.stats?.speed || p.speed
+        },
+        moves: [], // Initially empty for speed
+        selectedMoves: validSelectedMoves,
+        selectedTeraType: p.teraType || null,
+      };
+    });
 
     setTeam(mappedPokemons);
-    // toast.success(`Loaded team: ${savedTeam.name}`);
 
-    // Bước 2: "Hydrate" - Lấy lại thông tin chi tiết (Moves) chạy ngầm
-    // Để không chặn UI, ta dùng Promise.all nhưng không await ở cấp cao nhất
+    // 2. Hydrate Details (Async Fetch for Move Lists)
     toast.loading("Restoring move details...", { id: "restore-data" });
-    
+
     try {
       const enrichedTeam = await Promise.all(mappedPokemons.map(async (member) => {
-        // Kiểm tra cache local hoặc gọi API lấy full moves
-        const data = await getPokemonDetails(member.name); // Hoặc dùng getPokemonByName nếu có cache local tốt
-        
-        if (data) {
+        // Ưu tiên Local Cache
+        const localData = getPokemonByName(member.name);
+        // Fallback to API if no moves data
+        if (localData && localData.moves && localData.moves.length > 0) {
           return {
             ...member,
-            moves: data.moves, // Nạp lại danh sách moves đầy đủ (có power, type...)
-            stats: data.stats  // Cập nhật lại stats chuẩn (đề phòng DB lưu sai)
+            moves: localData.moves,
+            stats: localData.stats
           };
         }
+
+        const apiData = await getPokemonDetails(member.name);
+        if (apiData) {
+          return {
+            ...member,
+            moves: apiData.moves,
+            stats: apiData.stats
+          };
+        }
+
         return member;
       }));
 
-      // Cập nhật lại state lần 2 với đầy đủ thông tin
       setTeam(enrichedTeam);
-      toast.success("Team data restored completely!", { id: "restore-data" });
+      toast.success("Team data restored!", { id: "restore-data" });
     } catch (error) {
       toast.error("Could not fetch move details", { id: "restore-data" });
     }
@@ -139,20 +151,28 @@ export default function TeamBuilderPage() {
 
   const refreshMemberData = async (uuid: string, name: string) => {
     toast.loading(`Fetching moves for ${name}...`, { id: "loading-moves" });
+
+    // 1. Check Local Cache (Dùng biến const riêng)
     const localData = getPokemonByName(name);
+
     if (localData && localData.moves && localData.moves.length > 0) {
       setTeam(prev => prev.map(member => {
         if (member.uuid !== uuid) return member;
+        // Dùng localData (const) nên TS biết chắc chắn nó tồn tại
         return { ...member, moves: localData.moves, stats: localData.stats };
       }));
       toast.success("Moves loaded!", { id: "loading-moves" });
       return;
     }
-    const data = await getPokemonDetails(name);
-    if (data) {
+
+    // 2. Fetch API (Dùng biến const riêng)
+    const apiData = await getPokemonDetails(name);
+
+    if (apiData) {
       setTeam(prev => prev.map(member => {
         if (member.uuid !== uuid) return member;
-        return { ...member, moves: data.moves, stats: data.stats };
+        // Dùng apiData (const) nên TS không báo lỗi undefined nữa
+        return { ...member, moves: apiData.moves, stats: apiData.stats };
       }));
       toast.success("Moves loaded!", { id: "loading-moves" });
     } else {
@@ -195,11 +215,10 @@ export default function TeamBuilderPage() {
     if (!confirm("Delete this team?")) return;
     try {
       await fetch(`/api/teams/${id}`, { method: "DELETE" });
-      
-      // CẬP NHẬT STORE NGAY LẬP TỨC (Optimistic Update)
+
       const updatedList = mySavedTeam.filter(t => t.id !== id);
       setSavedTeam(updatedList);
-      
+
       toast.success("Team deleted");
       if (editingTeamId === id) resetBuilder();
     } catch (err) { toast.error("Failed to delete"); }
@@ -207,6 +226,8 @@ export default function TeamBuilderPage() {
 
   const saveTeamToDb = async () => {
     if (team.length === 0) return toast.error("Empty team!");
+    if (!session?.user) return toast.error("Please login to save!");
+
     setIsSaving(true);
 
     const payload = {
@@ -225,7 +246,7 @@ export default function TeamBuilderPage() {
         types: p.types,
         spriteUrl: p.sprite,
         order: index,
-        // Moves - QUAN TRỌNG: Thêm || null để tránh gửi undefined gây lỗi backend
+        // Moves - Safe nulls
         move1: p.selectedMoves[0] || null,
         move2: p.selectedMoves[1] || null,
         move3: p.selectedMoves[2] || null,
@@ -237,35 +258,38 @@ export default function TeamBuilderPage() {
     try {
       let res;
       if (editingTeamId) {
-        res = await fetch(`/api/teams/${editingTeamId}`, { 
-            method: "PUT", 
-            body: JSON.stringify(payload) 
+        res = await fetch(`/api/teams/${editingTeamId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload)
         });
       } else {
-        res = await fetch("/api/teams", { 
-            method: "POST", 
-            body: JSON.stringify(payload) 
+        res = await fetch("/api/teams", {
+          method: "POST",
+          body: JSON.stringify(payload)
         });
       }
 
-      // --- SỬA ĐOẠN NÀY ĐỂ DEBUG ---
       if (!res.ok) {
-        const errorDetail = await res.text(); // Đọc tin nhắn lỗi từ server
-        console.error("SERVER ERROR:", errorDetail); // In ra console của trình duyệt (F12)
+        const errorDetail = await res.text();
+        console.error("SERVER ERROR:", errorDetail);
         throw new Error(errorDetail || "Failed to save team");
       }
-      // -----------------------------
 
       const savedData = await res.json();
 
-      // (Đoạn fix undefined slice giữ nguyên)
+      // Fallback populate for optimistic UI
       if (!savedData.pokemons || savedData.pokemons.length === 0) {
         savedData.pokemons = team.map(p => ({
-            id: p.id,
-            name: p.name,
-            spriteUrl: p.sprite,
-            types: p.types
+          id: p.id,
+          name: p.name,
+          spriteUrl: p.sprite,
+          types: p.types
         }));
+      }
+
+      // Ensure User ID matches for correct filtering
+      if (session?.user?.id) {
+        savedData.userId = session.user.id;
       }
 
       if (editingTeamId) {
@@ -280,7 +304,6 @@ export default function TeamBuilderPage() {
 
     } catch (error: any) {
       console.error("Save Error:", error);
-      // Hiển thị lỗi chi tiết lên thông báo để bạn biết sai ở đâu
       toast.error(`Error: ${error.message}`);
     } finally {
       setIsSaving(false);
@@ -300,17 +323,22 @@ export default function TeamBuilderPage() {
     e.preventDefault();
     if (!modalQuery.trim()) return;
     setIsSearching(true);
+
     const results = await searchPokemonList(modalQuery);
+    // Filter out alternate forms from search to avoid duplicates
     const filteredResults = results.filter((p: any) => {
       const name = p.name.toLowerCase();
       return !name.includes("mega") && !name.includes("gmax") && !name.includes("gigantamax");
     });
+
     setModalResults(filteredResults);
     setIsSearching(false);
   };
 
   const selectPokemonFromModal = async (pokemonName: string) => {
     setIsSearching(true);
+
+    // Try local cache first for speed
     const localData = getPokemonByName(pokemonName);
     if (localData && localData.moves && localData.moves.length > 0) {
       setTeam([...team, { ...localData, selectedMoves: [], selectedTeraType: null, uuid: uuidv4() }]);
@@ -319,6 +347,8 @@ export default function TeamBuilderPage() {
       setIsSearching(false);
       return;
     }
+
+    // Fallback to API
     const fullData = await getPokemonDetails(pokemonName);
     if (fullData) {
       setTeam([...team, { ...fullData, selectedMoves: [], selectedTeraType: null, uuid: uuidv4() }]);
@@ -353,7 +383,6 @@ export default function TeamBuilderPage() {
         </div>
 
         <div className="flex-grow overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-          {/* Kiểm tra isDataLoaded thay vì isLoading cục bộ */}
           {!isDataLoaded ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-500">
               <Loader2 className="animate-spin mb-3 text-blue-500" size={32} />
@@ -362,21 +391,23 @@ export default function TeamBuilderPage() {
           ) : mySavedTeam.length === 0 ? (
             <div className="text-center text-slate-500 py-8 text-sm">No teams saved yet.</div>
           ) : (
-            mySavedTeam.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => loadTeamToEdit(t)}
-                className={`group p-3 rounded-lg border cursor-pointer transition-all hover:bg-slate-800 relative ${editingTeamId === t.id ? 'border-blue-500 bg-slate-800/50' : 'border-slate-800 bg-slate-950'}`}
-              >
-                <div className="font-bold text-sm mb-1 truncate pr-6 text-slate-200">{t.name}</div>
-                <div className="flex -space-x-2">
-                  {(t.pokemons || []).slice(0, 6).map((p: any) => (
-                    <img key={p.id} src={p.spriteUrl} className="w-8 h-8 rounded-full bg-slate-700 border border-slate-900" alt={p.name} />
-                  ))}
+            mySavedTeam
+              .filter((t: any) => t.userId === session?.user?.id) // Filter by User
+              .map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => loadTeamToEdit(t)}
+                  className={`group p-3 rounded-lg border cursor-pointer transition-all hover:bg-slate-800 relative ${editingTeamId === t.id ? 'border-blue-500 bg-slate-800/50' : 'border-slate-800 bg-slate-950'}`}
+                >
+                  <div className="font-bold text-sm mb-1 truncate pr-6 text-slate-200">{t.name}</div>
+                  <div className="flex -space-x-2">
+                    {(t.pokemons || []).slice(0, 6).map((p: any) => (
+                      <img key={p.id} src={p.spriteUrl} className="w-8 h-8 rounded-full bg-slate-700 border border-slate-900" alt={p.name} />
+                    ))}
+                  </div>
+                  <button onClick={(e) => deleteTeam(t.id, e)} className="absolute top-2 right-2 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
                 </div>
-                <button onClick={(e) => deleteTeam(t.id, e)} className="absolute top-2 right-2 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
-              </div>
-            ))
+              ))
           )}
         </div>
       </div>
@@ -464,9 +495,9 @@ export default function TeamBuilderPage() {
                         <Sparkles size={12} className="text-cyan-400" />
                         <span className="text-[9px] font-bold text-cyan-300">TERA TYPE:</span>
                       </div>
-                      
+
                       <div className="relative">
-                        <button 
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenTeraDropdownId(openTeraDropdownId === member.uuid ? null : member.uuid);
@@ -481,14 +512,14 @@ export default function TeamBuilderPage() {
 
                         {openTeraDropdownId === member.uuid && (
                           <>
-                            <div 
-                              className="fixed inset-0 z-40 cursor-default" 
+                            <div
+                              className="fixed inset-0 z-40 cursor-default"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenTeraDropdownId(null);
                               }}
                             />
-                            
+
                             <div className="absolute top-full left-0 right-0 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 grid grid-cols-3 gap-1 p-2 w-48 animate-in fade-in zoom-in-95 duration-200">
                               {ALL_TYPES.map((type) => (
                                 <button
@@ -501,8 +532,8 @@ export default function TeamBuilderPage() {
                                     setOpenTeraDropdownId(null);
                                   }}
                                   className={`py-1 px-1.5 rounded text-[10px] font-bold border transition-all ${member.selectedTeraType === type
-                                      ? `border-cyan-500 bg-cyan-500/30 text-cyan-300`
-                                      : `border-slate-600 bg-slate-700/30 text-slate-300 hover:border-cyan-600`
+                                    ? `border-cyan-500 bg-cyan-500/30 text-cyan-300`
+                                    : `border-slate-600 bg-slate-700/30 text-slate-300 hover:border-cyan-600`
                                     }`}
                                 >
                                   <TypeBadge type={type} className="text-[10px] px-1 py-0.5 w-full justify-center">
