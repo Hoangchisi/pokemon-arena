@@ -9,7 +9,7 @@ import BackgroundMusic from "@/components/layout/BackgroundMusic";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Pokemon Battle Simulator",
+  title: "PokeArena - Pokemon Battle Simulator",
   description: "Build team and fight!",
 };
 

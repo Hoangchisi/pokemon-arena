@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { BattlePokemon, Move, TransformationState } from '@/types/battle';
 import { calculateDamage, handleMegaEvolution, handleGigantamax, handleTerastallize } from '@/lib/battle-logic';
 import { getPokemonByName } from '@/lib/pokemon-forms';
-
+import { getHpModifier, getMultiHitCount, getTwoTurnInfo } from "@/data/gimmickMove";
 // --- DANH SÁCH BACKGROUND ---
 const ARENA_BACKGROUNDS = [
   "/backgrounds/arena/bg-1.png",
@@ -118,7 +118,7 @@ export const useBattleStore = create<BattleState>((set, get) => ({
       const newTeam = [...state[teamKey]];
       const pokemon = { ...newTeam[activeIdx] };
       const originalName = pokemon.name;
-      
+
       if (formType === 'mega') {
         const transformed = handleMegaEvolution(pokemon);
         Object.assign(pokemon, transformed);
@@ -250,69 +250,60 @@ export const useBattleStore = create<BattleState>((set, get) => ({
 
   executeTurn: async (playerMove, playerTransformation) => {
     const state = get();
+    // Kiểm tra an toàn: Nếu game đã xong hoặc đang chờ đổi Pokemon thì dừng
     if (state.winner || state.mustSwitch || !state.isPlayerTurn) return;
 
+    // Lấy Pokemon hiện tại (Snapshot trạng thái đầu lượt)
     const initialPlayerMon = state.myTeam[state.activePlayerIndex];
     const initialEnemyMon = state.enemyTeam[state.activeEnemyIndex];
 
     set({ isPlayerTurn: false });
 
     // =================================================================
-    // GIAI ĐOẠN 0: AI ENEMY BIẾN HÌNH
+    // GIAI ĐOẠN 0: AI ENEMY BIẾN HÌNH (MEGA/GMAX/TERA)
     // =================================================================
     if (!state.enemyUsedMechanic) {
       const eIndex = state.activeEnemyIndex;
       const enemyTeam = state.enemyTeam;
       const currentEnemy = enemyTeam[eIndex];
-
-      // Logic: Chỉ dùng cho Pokemon cuối cùng
       const isLastPokemon = eIndex === enemyTeam.length - 1;
 
       if (isLastPokemon) {
         let aiAction: 'mega' | 'gmax' | 'tera' | null = null;
         let targetTeraType: string | null = null;
 
-        // 1. Ưu tiên lấy từ config Ace Mechanic (Map từ database/npc.ts)
+        // 1. Ưu tiên config Ace
         if (currentEnemy.aceMechanic) {
           aiAction = currentEnemy.aceMechanic;
-          // Nếu là Tera, lấy hệ Tera đã chọn hoặc mặc định là hệ chính
           if (aiAction === 'tera') {
             targetTeraType = currentEnemy.selectedTeraType || currentEnemy.types[0];
           }
         }
-        // 2. Fallback: Tự động đoán nếu không có config
+        // 2. Fallback tự đoán
         else {
           const enemyData = getPokemonByName(currentEnemy.name);
-          const forms = enemyData?.forms;
-          if (forms) {
-            if (forms.gmax) aiAction = 'gmax';
-            else if (forms.mega) aiAction = 'mega';
-          }
+          if (enemyData?.forms?.gmax) aiAction = 'gmax';
+          else if (enemyData?.forms?.mega) aiAction = 'mega';
         }
 
-        // 3. Thực thi hành động
+        // 3. Thực thi
         if (aiAction) {
           let actionLog = "";
-
           if (aiAction === 'tera' && targetTeraType) {
-            // GỌI HÀM TERA CHO ENEMY
             get().applyTerastallize('enemy', targetTeraType);
             actionLog = `Enemy's Ace ${currentEnemy.name} Terastallized into ${targetTeraType} type!`;
           }
           else if (aiAction === 'mega' || aiAction === 'gmax') {
-            // GỌI HÀM TRANSFORM
             get().applyTransformation('enemy', aiAction);
             const actionName = aiAction === 'gmax' ? 'Gigantamaxed' : 'Mega Evolved';
             actionLog = `Enemy's Ace ${currentEnemy.name} ${actionName}!`;
           }
 
-          // Cập nhật log và chặn dùng lại
           if (actionLog) {
             set(s => ({
               logs: [...s.logs, actionLog],
               enemyUsedMechanic: true
             }));
-            // Delay để người chơi kịp nhìn
             await new Promise(r => setTimeout(r, 1000));
           }
         }
@@ -347,16 +338,18 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     }
 
     // =================================================================
-    // GIAI ĐOẠN 2 & 3: TÍNH TOÁN VÀ CHIẾN ĐẤU (GIỮ NGUYÊN)
+    // GIAI ĐOẠN 2: CHUẨN BỊ CHIÊU THỨC & TỐC ĐỘ
     // =================================================================
     const currentState = get();
+    // Lấy lại Pokemon mới nhất (vì có thể vừa biến hình xong stats thay đổi)
     const updatedPlayerMon = currentState.myTeam[currentState.activePlayerIndex];
     const currentEnemy = currentState.enemyTeam[currentState.activeEnemyIndex];
 
-    // Lấy lại chiêu thức (để update damage nếu vừa Gmax)
+    // Cập nhật Move (nếu Gmax thì move base đổi thành Max Move)
     const updatedPlayerMove = updatedPlayerMon.moves.find(m => m.name === playerMove.name) || playerMove;
-    const enemyMove = getSmartEnemyMove(initialEnemyMon, initialPlayerMon);
+    const enemyMove = getSmartEnemyMove(currentEnemy, updatedPlayerMon);
 
+    // Tính tốc độ
     let playerGoesFirst = true;
     const pPriority = updatedPlayerMove.priority || 0;
     const ePriority = enemyMove.priority || 0;
@@ -366,84 +359,237 @@ export const useBattleStore = create<BattleState>((set, get) => ({
     else {
       if (updatedPlayerMon.stats.speed > currentEnemy.stats.speed) playerGoesFirst = true;
       else if (updatedPlayerMon.stats.speed < currentEnemy.stats.speed) playerGoesFirst = false;
-      else playerGoesFirst = Math.random() < 0.5;
+      else playerGoesFirst = Math.random() < 0.5; // Speed tie
     }
 
-    const performAttack = async (attacker: BattlePokemon, defender: BattlePokemon, move: Move, isPlayerAttacking: boolean): Promise<boolean> => {
-      if (attacker.currentHp === 0) return false;
+    // =================================================================
+    // HÀM HELPER: THỰC THI TẤN CÔNG
+    // =================================================================
+const performAttack = async (attacker: BattlePokemon, defender: BattlePokemon, move: Move, isPlayerAttacking: boolean): Promise<boolean> => {
+      // 1. Check Attacker còn sống không
+      if (attacker.currentHp <= 0) return false;
+
       set({ attackingSide: isPlayerAttacking ? 'player' : 'enemy' });
       await new Promise(r => setTimeout(r, 300));
 
-      const moveAccuracy = move.accuracy !== undefined ? move.accuracy : 100;
+      let currentLogs = [...get().logs];
 
-      // Random từ 0 -> 100
-      const hitChance = Math.random() * 100;
-
-      // Log tên chiêu trước
-      let currentLogs = [...get().logs, `${attacker.name} used ${move.name}!`];
-
-      // 2. KIỂM TRA TRÚNG / TRƯỢT
-      // Lưu ý: Các chiêu tất trúng (như Aerial Ace) hoặc đang Gmax (Max Moves tất trúng) có thể bỏ qua check này.
-      // Ở đây ta làm logic cơ bản:
-      let isMiss = hitChance > moveAccuracy;
-
-      // (Tùy chọn) Max Moves của Gmax thường không bao giờ trượt (trừ Max Guard)
-      if (attacker.transformation?.form === 'gmax') {
-        isMiss = false;
+      // --- XỬ LÝ CHARGING MOVE ---
+      if (attacker.chargingMove) {
+          currentLogs.push(`${attacker.name} used ${attacker.chargingMove}!`);
+          attacker.chargingMove = null;
+      } else {
+          const twoTurnInfo = getTwoTurnInfo(move.name);
+          if (twoTurnInfo) {
+              currentLogs.push(`${attacker.name} used ${move.name}!`);
+              currentLogs.push(`${attacker.name} ${twoTurnInfo.message}`);
+              attacker.chargingMove = move.name;
+              
+              const newTeam = isPlayerAttacking ? [...get().myTeam] : [...get().enemyTeam];
+              const index = isPlayerAttacking ? get().activePlayerIndex : get().activeEnemyIndex;
+              newTeam[index] = attacker;
+              
+              if (isPlayerAttacking) set({ myTeam: newTeam, logs: currentLogs, attackingSide: null });
+              else set({ enemyTeam: newTeam, logs: currentLogs, attackingSide: null });
+              
+              await new Promise(r => setTimeout(r, 1000));
+              return false;
+          }
+          currentLogs.push(`${attacker.name} used ${move.name}!`);
       }
 
+      // --- CHECK ACCURACY ---
+      const moveAccuracy = move.accuracy !== undefined ? move.accuracy : 100;
+      let isMiss = Math.random() * 100 > moveAccuracy;
+      if (attacker.transformation?.form === 'gmax' && move.category !== 'status') isMiss = false;
+
       if (isMiss) {
-        // --- XỬ LÝ KHI TRƯỢT ---
         currentLogs.push(`${attacker.name}'s attack missed!`);
         set({ logs: currentLogs, attackingSide: null });
         await new Promise(r => setTimeout(r, 1000));
-        return false; // Kết thúc lượt đánh, không ai chết
+        return false;
       }
 
-      const { damage, effectiveness, isCritical } = calculateDamage(attacker, defender, move);
-      const newDefenderHp = Math.max(0, defender.currentHp - damage);
+      // =================================================================
+      // 2. TÍNH DAMAGE (FIX LỖI OHKO & RECOIL)
+      // =================================================================
+      const possibleHits = getMultiHitCount(move.name);
+      let actualHits = 0;
+      let totalDamageDealt = 0;
+      let tempDefenderHp = defender.currentHp;
+      let firstHitCritical = false;
+      let firstHitEffectiveness = 1;
 
-      let newLogs = [...get().logs, `${attacker.name} used ${move.name}!`];
-      if (isCritical) newLogs.push("A critical hit!");
-      const effText = getEffectivenessText(effectiveness, defender.name);
-      if (effText) newLogs.push(effText);
-      newLogs.push(`It dealt ${damage} damage!`);
+      for (let i = 0; i < possibleHits; i++) {
+        // QUAN TRỌNG: Chỉ break vòng lặp từ HIT THỨ 2 trở đi.
+        // Hit đầu tiên (i=0) LUÔN CHẠY để đảm bảo damage được tính.
+        if (i > 0 && tempDefenderHp <= 0) break;
 
+        const { damage, effectiveness, isCritical } = calculateDamage(attacker, defender, move);
+        const damageToDeal = Number(damage);
+        
+        // Cộng dồn damage TRƯỚC khi trừ HP
+        totalDamageDealt += damageToDeal;
+        
+        // Trừ HP (Không cho âm)
+        tempDefenderHp = Math.max(0, tempDefenderHp - damageToDeal);
+        actualHits++;
+
+        if (i === 0) {
+          firstHitCritical = isCritical;
+          firstHitEffectiveness = effectiveness;
+        }
+      }
+
+      // Log kết quả tấn công
+      if (firstHitCritical) currentLogs.push("A critical hit!");
+      const effText = getEffectivenessText(firstHitEffectiveness, defender.name);
+      if (effText) currentLogs.push(effText);
+      
+      currentLogs.push(`It dealt ${totalDamageDealt} damage!`);
+      if (actualHits > 1) currentLogs.push(`Hit ${actualHits} time(s)!`);
+
+      // =================================================================
+      // 3. XỬ LÝ RECOIL / DRAIN / SUICIDE (ĐẢM BẢO CHẠY)
+      // =================================================================
+      const hpMod = getHpModifier(move.name);
+      let attackerNewHp = attacker.currentHp;
+
+      // DEBUG: Kiểm tra xem code có nhận diện được chiêu Recoil không
+      if (hpMod) {
+         console.log(`[BattleDebug] Recoil Triggered for ${move.name}. Dmg: ${totalDamageDealt}. Type: ${hpMod.type}`);
+      }
+
+      if (hpMod) {
+        let amount = 0;
+        
+        // Nhóm 1: Dựa trên Damage (Drain, Recoil thường)
+        if (hpMod.type === 'drain' || hpMod.type === 'recoil') {
+            // Logic: Dù OHKO (đối thủ chết ngay), totalDamageDealt vẫn > 0
+            if (totalDamageDealt > 0) {
+                 const rawAmount = Math.floor(totalDamageDealt * (hpMod.percent / 100));
+                 amount = rawAmount < 1 ? 1 : rawAmount;
+            }
+        }
+        // Nhóm 2: Dựa trên Max HP (Steel Beam)
+        else if (hpMod.type === 'recoil_max') {
+             amount = Math.ceil(attacker.maxHp * (hpMod.percent / 100));
+        }
+        // Nhóm 3: Tự sát (Explosion)
+        else if (hpMod.type === 'suicide') {
+             amount = attacker.currentHp;
+        }
+
+        // Áp dụng sát thương / hồi máu
+        if (amount > 0) {
+            if (hpMod.type === 'drain') {
+                const missingHp = attacker.maxHp - attacker.currentHp;
+                const healed = Math.min(missingHp, amount);
+                if (healed > 0) {
+                    attackerNewHp += healed;
+                    currentLogs.push(`${attacker.name} restored ${healed} HP!`);
+                }
+            } 
+            else {
+                // RECOIL / SUICIDE
+                // Đảm bảo không trừ quá số máu hiện có
+                const damageTaken = Math.min(attackerNewHp, amount);
+                attackerNewHp -= damageTaken;
+                
+                // Chỉ log recoil nếu không phải tự sát (tự sát sẽ có log faint sau)
+                if (hpMod.type !== 'suicide') {
+                    if (hpMod.type === 'recoil_max') {
+                         currentLogs.push(`${attacker.name} cut its own HP!`);
+                    } else {
+                         currentLogs.push(`${attacker.name} took ${damageTaken} recoil damage!`);
+                    }
+                }
+            }
+        }
+      }
+
+      // =================================================================
+      // 4. CẬP NHẬT STATE (QUAN TRỌNG: UPDATE CẢ 2 BÊN)
+      // =================================================================
       if (isPlayerAttacking) {
         const newEnemyTeam = [...get().enemyTeam];
-        newEnemyTeam[get().activeEnemyIndex] = { ...defender, currentHp: newDefenderHp };
-        set({ enemyTeam: newEnemyTeam, logs: newLogs, attackingSide: null });
+        newEnemyTeam[get().activeEnemyIndex] = { ...defender, currentHp: tempDefenderHp };
+        
+        const newMyTeam = [...get().myTeam];
+        newMyTeam[get().activePlayerIndex] = { ...attacker, currentHp: attackerNewHp };
+
+        set({ myTeam: newMyTeam, enemyTeam: newEnemyTeam, logs: currentLogs, attackingSide: null });
       } else {
         const newMyTeam = [...get().myTeam];
-        newMyTeam[get().activePlayerIndex] = { ...defender, currentHp: newDefenderHp };
-        set({ myTeam: newMyTeam, logs: newLogs, attackingSide: null });
+        newMyTeam[get().activePlayerIndex] = { ...defender, currentHp: tempDefenderHp };
+
+        const newEnemyTeam = [...get().enemyTeam];
+        newEnemyTeam[get().activeEnemyIndex] = { ...attacker, currentHp: attackerNewHp };
+
+        set({ myTeam: newMyTeam, enemyTeam: newEnemyTeam, logs: currentLogs, attackingSide: null });
       }
 
       await new Promise(r => setTimeout(r, 1000));
 
-      if (newDefenderHp === 0) {
-        set(s => ({ logs: [...s.logs, `${defender.name} fainted!`] }));
+      let turnEnded = false;
+
+      // =================================================================
+      // 5. CHECK FAINT
+      // =================================================================
+      
+      // A. Defender Faint
+      if (tempDefenderHp === 0) {
+        currentLogs.push(`${defender.name} fainted!`);
+        set({ logs: currentLogs }); // Update UI ngay
+        turnEnded = true;
+        
         if (isPlayerAttacking) {
-          const newEnemyTeam = get().enemyTeam;
-          const nextEnemyIndex = newEnemyTeam.findIndex(p => p.currentHp > 0);
-          if (nextEnemyIndex === -1) {
-            set({ winner: 'PLAYER', logs: [...get().logs, "You Win!"] });
-          } else {
-            await new Promise(r => setTimeout(r, 1000));
-            set({ activeEnemyIndex: nextEnemyIndex, isPlayerTurn: true, logs: [...get().logs, `Enemy sent out ${newEnemyTeam[nextEnemyIndex].name}!`] });
-          }
+             const newEnemyTeam = get().enemyTeam;
+             const nextEnemyIndex = newEnemyTeam.findIndex(p => p.currentHp > 0);
+             if (nextEnemyIndex === -1) {
+                 set({ winner: 'PLAYER', logs: [...currentLogs, "You Win!"] });
+             } else {
+                 setTimeout(() => {
+                     if (!get().winner) set({ activeEnemyIndex: nextEnemyIndex, isPlayerTurn: true, logs: [...currentLogs, `Enemy sent out ${newEnemyTeam[nextEnemyIndex].name}!`] });
+                 }, 1000);
+             }
         } else {
-          const newMyTeam = get().myTeam;
-          const hasAlive = newMyTeam.some(p => p.currentHp > 0);
-          if (!hasAlive) {
-            set({ winner: 'ENEMY', logs: [...get().logs, "You Lose!"] });
-          } else {
-            set({ mustSwitch: true, logs: [...get().logs, "Choose next Pokemon!"] });
-          }
+             const newMyTeam = get().myTeam;
+             if (!newMyTeam.some(p => p.currentHp > 0)) {
+                 set({ winner: 'ENEMY', logs: [...currentLogs, "You Lose!"] });
+             } else {
+                 set({ mustSwitch: true, logs: [...currentLogs, "Choose next Pokemon!"] });
+             }
         }
-        return true;
       }
-      return false;
+
+      // B. Attacker Faint (Do Recoil)
+      // Check riêng biệt để xử lý Double KO
+      if (attackerNewHp === 0) {
+         currentLogs.push(`${attacker.name} fainted from recoil!`);
+         set({ logs: currentLogs });
+         turnEnded = true;
+
+         if (isPlayerAttacking) {
+            const hasAlive = get().myTeam.some(p => p.currentHp > 0);
+            if (!hasAlive && !get().winner) {
+                set({ winner: 'ENEMY', logs: [...currentLogs, "You Lose!"] });
+            } else if (!get().winner) {
+                set({ mustSwitch: true, logs: [...currentLogs, "Choose next Pokemon!"] });
+            }
+         } else {
+            const nextIdx = get().enemyTeam.findIndex(p => p.currentHp > 0);
+            if (nextIdx === -1 && !get().winner) {
+                set({ winner: 'PLAYER', logs: [...currentLogs, "You Win!"] });
+            } else if (!get().winner) {
+                setTimeout(() => {
+                    set({ activeEnemyIndex: nextIdx, isPlayerTurn: true, logs: [...currentLogs, `Enemy sent out ${get().enemyTeam[nextIdx].name}!`] });
+                }, 1000);
+            }
+         }
+      }
+
+      return turnEnded;
     };
 
     if (playerGoesFirst) {
