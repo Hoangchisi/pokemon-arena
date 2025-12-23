@@ -210,9 +210,9 @@ export const handleGigantamax = (pokemon: BattlePokemon): BattlePokemon => {
     const idMatch = gmaxForm?.sprite.match(/\/(\d+)\.png$/);
     
     if (idMatch && idMatch[1]) {
-      const megaId = idMatch[1];
+      const GmaxId = idMatch[1];
       // Tạo URL Shiny thủ công
-      gmaxSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${megaId}.png`;
+      gmaxSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${GmaxId}.png`;
     }
   }
   // Gmax backSprite: dùng chính gmaxSprite (vì backSprite sẽ flip bằng CSS)

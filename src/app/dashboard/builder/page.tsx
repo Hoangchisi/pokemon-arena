@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-hot-toast";
 import {
-  Save, Trash2, Plus, LayoutList, ChevronDown, DownloadCloud, Loader2, Search, X, Zap, Sparkles
+  Save, Trash2, Plus, LayoutList, ChevronDown, DownloadCloud, Loader2, Search, X, Zap, Sparkles, Filter
 } from "lucide-react";
 import { getPokemonDetails, searchPokemonList } from "@/lib/pokeapi";
 import { getPokemonByName } from "@/lib/pokemon-forms";
@@ -75,6 +75,10 @@ export default function TeamBuilderPage() {
   const [modalResults, setModalResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // --- SEARCH FILTER STATES ---
+  const [filterType, setFilterType] = useState<string | null>(null); // Lưu hệ đang lọc
+  const [isFilterOpen, setIsFilterOpen] = useState(false); // Bật tắt menu filter
+
   // Dropdown Logic
   const [openTeraDropdownId, setOpenTeraDropdownId] = useState<string | null>(null);
 
@@ -108,7 +112,7 @@ export default function TeamBuilderPage() {
         // Lọc kết quả (Logic cũ của bạn: bỏ mega/gmax để tránh trùng lặp form)
         const filteredResults = results.filter((p: any) => {
           const name = p.name.toLowerCase();
-          return !name.includes("mega") && !name.includes("gmax") && !name.includes("gigantamax");
+          return !name.includes("mega") && !name.includes("gmax") && !name.includes("gigantamax") && !name.includes("-primal") && !name.includes("-ash") && !name.includes("-battle-bond");
         });
 
         setModalResults(filteredResults);
@@ -361,7 +365,10 @@ export default function TeamBuilderPage() {
     setIsModalOpen(true);
     setModalQuery("");
     setModalResults([]);
+    setFilterType(null); // Reset filter
+    setIsFilterOpen(false);
     setTimeout(() => document.getElementById("search-input")?.focus(), 100);
+
   };
 
   const handleModalSearch = async (e: React.FormEvent) => {
@@ -414,6 +421,12 @@ export default function TeamBuilderPage() {
       <span className="w-6 text-right font-bold text-white">{value}</span>
     </div>
   );
+  // --- LOGIC LỌC KẾT QUẢ HIỂN THỊ ---
+  // Lọc modalResults dựa trên filterType được chọn
+  const displayedResults = modalResults.filter((p) => {
+    if (!filterType) return true; // Nếu chưa chọn filter thì hiện hết
+    return p.types.includes(filterType); // Chỉ hiện pokemon có chứa hệ đã chọn
+  });
 
   return (
     <div className="container mx-auto p-4 max-w-7xl h-[calc(100vh-80px)] flex gap-6">
@@ -665,7 +678,7 @@ export default function TeamBuilderPage() {
         </div>
       </div>
 
-      {/* --- MODAL SEARCH --- */}
+      {/* --- MODAL SEARCH (CẬP NHẬT FILTER) --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
@@ -673,68 +686,100 @@ export default function TeamBuilderPage() {
             {/* Header Modal */}
             <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
               <h3 className="text-lg font-bold text-white">Add Pokemon</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X size={24} />
-              </button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition-colors"><X size={24} /></button>
             </div>
 
-            {/* Input Search - Đã bỏ thẻ <form> vì không cần submit nữa */}
-            <div className="p-4 border-b border-slate-700">
-              <div className="relative">
+            {/* --- THANH TÌM KIẾM + NÚT FILTER --- */}
+            <div className="p-4 border-b border-slate-700 flex gap-2 items-center relative z-20">
+              {/* Input */}
+              <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
                 <input
                   id="search-input"
                   type="text"
                   placeholder="Type name (e.g., 'pika')..."
                   className="w-full bg-slate-950 border border-slate-600 rounded-lg py-3 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
-
-                  // Value liên kết với state
                   value={modalQuery}
-
-                  // Chỉ cần cập nhật state, useEffect sẽ lo phần còn lại
                   onChange={(e) => setModalQuery(e.target.value)}
-
                   autoComplete="off"
                 />
+                {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={16} />}
+              </div>
 
-                {/* (Tùy chọn) Hiển thị spinner nhỏ ngay trong input nếu đang gõ */}
-                {isSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={16} />
+              {/* Nút Filter */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className={`p-3 rounded-lg border transition-all ${filterType
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_10px_rgba(37,99,235,0.5)]'
+                      : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-white hover:border-slate-500'
+                    }`}
+                  title="Filter by Type"
+                >
+                  <Filter size={20} />
+                </button>
+
+                {/* Dropdown Menu Filter */}
+                {isFilterOpen && (
+                  <>
+                    {/* Lớp phủ để click outside đóng menu */}
+                    <div className="fixed inset-0 z-30" onClick={() => setIsFilterOpen(false)} />
+
+                    <div className="absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-40 p-2 w-64 animate-in fade-in zoom-in-95 duration-200 grid grid-cols-3 gap-1.5">
+                      {/* Nút Reset Filter */}
+                      <button
+                        onClick={() => { setFilterType(null); setIsFilterOpen(false); }}
+                        className={`col-span-3 py-1.5 rounded text-xs font-bold border transition-all mb-1 ${!filterType ? 'bg-white text-black border-white' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
+                      >
+                        ALL TYPES
+                      </button>
+
+                      {/* Danh sách Type */}
+                      {ALL_TYPES.map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            setFilterType(filterType === type ? null : type); // Toggle logic
+                            setIsFilterOpen(false);
+                          }}
+                          className={`
+                            py-1 px-1 rounded border transition-all flex items-center justify-center
+                            ${filterType === type
+                              ? 'bg-slate-700 border-white ring-1 ring-white'
+                              : 'bg-slate-800 border-slate-700 hover:border-slate-500'
+                            }
+                          `}
+                        >
+                          <TypeBadge type={type} className="text-[10px] py-0.5 px-1 w-full justify-center" />
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
 
-            {/* Result List */}
+            {/* --- RESULT LIST --- */}
             <div className="flex-grow overflow-y-auto p-2 space-y-2 custom-scrollbar bg-slate-950/50">
               {isSearching ? (
-                // Khi đang chờ debounce hoặc đang fetch API
-                <div className="flex flex-col items-center justify-center py-10 text-slate-500">
-                  <Loader2 className="animate-spin mb-2" />
-                  <span>Searching...</span>
-                </div>
+                <div className="flex flex-col items-center justify-center py-10 text-slate-500"><Loader2 className="animate-spin mb-2" /><span>Searching...</span></div>
               ) : modalResults.length === 0 ? (
-                // Khi không có kết quả
-                <div className="text-center text-slate-500 py-10">
-                  {modalQuery ? "No Pokemon found." : "Start typing to search."}
+                <div className="text-center text-slate-500 py-10">{modalQuery ? "No Pokemon found." : "Search to see results."}</div>
+              ) : displayedResults.length === 0 ? (
+                // Trường hợp có kết quả search nhưng bị Filter lọc hết
+                <div className="flex flex-col items-center justify-center py-10 text-slate-500 gap-2">
+                  <Filter className="opacity-50" size={32} />
+                  <p>No {filterType?.toUpperCase()} Pokemon found in results.</p>
+                  <button onClick={() => setFilterType(null)} className="text-blue-400 hover:underline text-sm">Clear Filter</button>
                 </div>
               ) : (
-                // Hiển thị kết quả
-                modalResults.map((p) => (
-                  <button
-                    key={p.name}
-                    onClick={() => selectPokemonFromModal(p.name)}
-                    className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all group text-left"
-                  >
-                    <img
-                      src={p.sprite}
-                      className="w-12 h-12 pixelated bg-slate-900 rounded-lg border border-slate-800 group-hover:scale-110 transition-transform"
-                      alt={p.name}
-                    />
+                // Hiển thị kết quả đã lọc (displayedResults)
+                displayedResults.map((p) => (
+                  <button key={p.name} onClick={() => selectPokemonFromModal(p.name)} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all group text-left">
+                    <img src={p.sprite} className="w-12 h-12 pixelated bg-slate-900 rounded-lg border border-slate-800 group-hover:scale-110 transition-transform" alt={p.name} />
                     <div className="flex-grow">
                       <h4 className="font-bold text-white capitalize text-lg">{p.name}</h4>
-                      <div className="flex gap-1">
-                        {p.types.map((t: string) => <TypeBadge key={t} type={t} className="text-[10px] py-0.5" />)}
-                      </div>
+                      <div className="flex gap-1">{p.types.map((t: string) => <TypeBadge key={t} type={t} className="text-[10px] py-0.5" />)}</div>
                     </div>
                     <Plus className="text-slate-500 group-hover:text-green-500 transition-colors" />
                   </button>
