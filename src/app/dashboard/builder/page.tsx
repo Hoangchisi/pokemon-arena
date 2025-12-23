@@ -69,7 +69,7 @@ export default function TeamBuilderPage() {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Modal Search
+  // --- MODAL SEARCH STATES ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalQuery, setModalQuery] = useState("");
   const [modalResults, setModalResults] = useState<any[]>([]);
@@ -82,6 +82,51 @@ export default function TeamBuilderPage() {
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
+
+  // =================================================================
+  // LOGIC TÌM KIẾM MỚI (DEBOUNCE 0.5s)
+  // =================================================================
+  useEffect(() => {
+    // 1. Nếu ô input trống hoặc chỉ có khoảng trắng -> Reset kết quả & tắt loading
+    if (!modalQuery.trim()) {
+      setModalResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // 2. Đánh dấu đang tìm kiếm ngay lập tức khi user gõ
+    setIsSearching(true);
+
+    // 3. Đặt bộ đếm thời gian (Timeout) 0.5s
+    const timeoutId = setTimeout(async () => {
+      try {
+        console.log(`Đang tìm kiếm: ${modalQuery}...`);
+
+        // Gọi API tìm kiếm
+        const results = await searchPokemonList(modalQuery);
+
+        // Lọc kết quả (Logic cũ của bạn: bỏ mega/gmax để tránh trùng lặp form)
+        const filteredResults = results.filter((p: any) => {
+          const name = p.name.toLowerCase();
+          return !name.includes("mega") && !name.includes("gmax") && !name.includes("gigantamax");
+        });
+
+        setModalResults(filteredResults);
+      } catch (error) {
+        console.error("Lỗi tìm kiếm:", error);
+        setModalResults([]); // Xóa kết quả nếu lỗi
+      } finally {
+        // 4. Kết thúc tìm kiếm -> Reset biến isSearching về false (0)
+        setIsSearching(false);
+      }
+    }, 500); // 500ms = 0.5s
+
+    // Cleanup Function: Hàm này chạy khi modalQuery thay đổi HOẶC component unmount
+    // Nó sẽ hủy timeout cũ đi. Nếu user gõ liên tục, timeout liên tục bị hủy và tạo mới.
+    // Chỉ khi user DỪNG gõ quá 0.5s thì hàm trong setTimeout mới được chạy.
+    return () => clearTimeout(timeoutId);
+
+  }, [modalQuery]); // Dependency: Chạy lại effect này mỗi khi modalQuery thay đổi
 
   // --- LOGIC: LOAD TEAM TO EDIT ---
   const loadTeamToEdit = async (savedTeam: any) => {
@@ -624,34 +669,79 @@ export default function TeamBuilderPage() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+
+            {/* Header Modal */}
             <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
               <h3 className="text-lg font-bold text-white">Add Pokemon</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition-colors"><X size={24} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
             </div>
+
+            {/* Input Search - Đã bỏ thẻ <form> vì không cần submit nữa */}
             <div className="p-4 border-b border-slate-700">
-              <form onSubmit={handleModalSearch} className="relative">
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
-                <input id="search-input" type="text" placeholder="Type name (e.g., 'pika')..." className="w-full bg-slate-950 border border-slate-600 rounded-lg py-3 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors" value={modalQuery} onChange={(e) => setModalQuery(e.target.value)} autoComplete="off" />
-              </form>
+                <input
+                  id="search-input"
+                  type="text"
+                  placeholder="Type name (e.g., 'pika')..."
+                  className="w-full bg-slate-950 border border-slate-600 rounded-lg py-3 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
+
+                  // Value liên kết với state
+                  value={modalQuery}
+
+                  // Chỉ cần cập nhật state, useEffect sẽ lo phần còn lại
+                  onChange={(e) => setModalQuery(e.target.value)}
+
+                  autoComplete="off"
+                />
+
+                {/* (Tùy chọn) Hiển thị spinner nhỏ ngay trong input nếu đang gõ */}
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={16} />
+                )}
+              </div>
             </div>
+
+            {/* Result List */}
             <div className="flex-grow overflow-y-auto p-2 space-y-2 custom-scrollbar bg-slate-950/50">
               {isSearching ? (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-500"><Loader2 className="animate-spin mb-2" /><span>Searching...</span></div>
+                // Khi đang chờ debounce hoặc đang fetch API
+                <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+                  <Loader2 className="animate-spin mb-2" />
+                  <span>Searching...</span>
+                </div>
               ) : modalResults.length === 0 ? (
-                <div className="text-center text-slate-500 py-10">{modalQuery ? "No Pokemon found." : "Search to see results."}</div>
+                // Khi không có kết quả
+                <div className="text-center text-slate-500 py-10">
+                  {modalQuery ? "No Pokemon found." : "Start typing to search."}
+                </div>
               ) : (
+                // Hiển thị kết quả
                 modalResults.map((p) => (
-                  <button key={p.name} onClick={() => selectPokemonFromModal(p.name)} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all group text-left">
-                    <img src={p.sprite} className="w-12 h-12 pixelated bg-slate-900 rounded-lg border border-slate-800 group-hover:scale-110 transition-transform" alt={p.name} />
+                  <button
+                    key={p.name}
+                    onClick={() => selectPokemonFromModal(p.name)}
+                    className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all group text-left"
+                  >
+                    <img
+                      src={p.sprite}
+                      className="w-12 h-12 pixelated bg-slate-900 rounded-lg border border-slate-800 group-hover:scale-110 transition-transform"
+                      alt={p.name}
+                    />
                     <div className="flex-grow">
                       <h4 className="font-bold text-white capitalize text-lg">{p.name}</h4>
-                      <div className="flex gap-1">{p.types.map((t: string) => <TypeBadge key={t} type={t} className="text-[10px] py-0.5" />)}</div>
+                      <div className="flex gap-1">
+                        {p.types.map((t: string) => <TypeBadge key={t} type={t} className="text-[10px] py-0.5" />)}
+                      </div>
                     </div>
                     <Plus className="text-slate-500 group-hover:text-green-500 transition-colors" />
                   </button>
                 ))
               )}
             </div>
+
           </div>
         </div>
       )}
