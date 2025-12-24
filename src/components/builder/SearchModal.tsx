@@ -5,8 +5,7 @@ import {
   Search, X, Filter, Loader2, Plus 
 } from "lucide-react";
 import { searchPokemonList } from "@/lib/pokeapi";
-import { TypeBadge } from "@/components/ui/TypeBadge";
-import { ALL_TYPES } from "@/lib/constants";
+import { TypeBadge, ALL_TYPES } from "@/components/ui/TypeBadge";
 
 interface SearchModalProps {
   isOpen: boolean;
