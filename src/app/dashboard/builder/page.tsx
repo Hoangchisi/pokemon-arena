@@ -19,7 +19,7 @@ export default function TeamBuilderPage() {
   const { mySavedTeam, fetchUserData, setSavedTeam, isDataLoaded } = useUserStore();
 
   // --- GLOBAL STATES ---
-  const [teamName, setTeamName] = useState("My New Team");
+  const [teamName, setTeamName] = useState("");
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -179,7 +179,7 @@ export default function TeamBuilderPage() {
   
   const resetBuilder = () => { 
       setEditingTeamId(null); 
-      setTeamName("My New Team"); 
+      setTeamName(""); 
       setTeam([]); 
       toast("Builder reset", { icon: "🧹" });
   };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom"; // IMPORT THÊM
+import { createPortal } from "react-dom";
 import {
   Activity, Zap, Crown, Sparkles, RefreshCw,
   RotateCcw, X, ArrowLeftRight, LogOut,
@@ -61,19 +61,18 @@ const StatRow = ({ icon, label, value }: { icon: React.ReactNode, label: string,
   </div>
 );
 
-// --- TOOLTIP COMPONENT (UPDATED WITH PORTAL) ---
+// --- TOOLTIP COMPONENT ---
 interface PokemonStatsTooltipProps {
   pokemon: any;
-  anchorRect: DOMRect | null; // Thay đổi: Nhận vị trí thay vì tự định vị
+  anchorRect: DOMRect | null;
   side?: 'left' | 'right' | 'top' | 'bottom';
 }
 
 const PokemonStatsTooltip = ({ pokemon, anchorRect, side = 'right' }: PokemonStatsTooltipProps) => {
   if (!anchorRect) return null;
 
-  // Tính toán vị trí Fixed dựa trên Anchor Rect
   const getStyle = (): React.CSSProperties => {
-    const gap = 12; // Khoảng cách giữa tooltip và target
+    const gap = 12;
     let top = 0;
     let left = 0;
     let transform = '';
@@ -101,14 +100,9 @@ const PokemonStatsTooltip = ({ pokemon, anchorRect, side = 'right' }: PokemonSta
         break;
     }
 
-    return {
-      top: `${top}px`,
-      left: `${left}px`,
-      transform,
-    };
+    return { top: `${top}px`, left: `${left}px`, transform };
   };
 
-  // Sử dụng Portal để render vào body -> Thoát khỏi mọi overflow hidden và z-index context cũ
   return createPortal(
     <div
       style={getStyle()}
@@ -144,7 +138,6 @@ export default function MobileArena({
   setControlView, setShowMetrics, handleAttack, handleSwitch, onReturnToLobby
 }: ArenaViewProps) {
 
-  // State quản lý tooltip tập trung
   const [tooltipState, setTooltipState] = useState<{
     pokemon: any;
     anchorRect: DOMRect;
@@ -154,8 +147,11 @@ export default function MobileArena({
   const scrollRef = useRef<HTMLDivElement>(null);
   const battleBackground = useBattleStore((s) => s.battleBackground);
 
-  // Helper function để set tooltip
+  // --- LOGIC XỬ LÝ HOVER/TOUCH ---
+  
+  // 1. Logic cho Desktop (Hover)
   const handleMouseEnter = (e: React.MouseEvent, pokemon: any, side: 'left' | 'right' | 'top' | 'bottom') => {
+    // Chỉ kích hoạt nếu không phải là thiết bị cảm ứng (tùy chọn, nhưng giữ cả 2 cho hybrid)
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipState({ pokemon, anchorRect: rect, side });
   };
@@ -164,7 +160,21 @@ export default function MobileArena({
     setTooltipState(null);
   };
 
-  // Auto scroll logs
+  // 2. Logic cho Mobile (Touch & Hold)
+  const handleTouchStart = (e: React.TouchEvent, pokemon: any, side: 'left' | 'right' | 'top' | 'bottom') => {
+    // Ngăn chặn sự kiện click chuột ảo theo sau touch nếu cần thiết
+    // e.preventDefault(); 
+    
+    // Lấy vị trí phần tử
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipState({ pokemon, anchorRect: rect, side });
+  };
+
+  const handleTouchEnd = () => {
+    // Khi thả tay ra -> Tắt tooltip ngay lập tức
+    setTooltipState(null);
+  };
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [logs]);
@@ -173,9 +183,9 @@ export default function MobileArena({
   const enemyPokemon = enemyTeam[activeEnemyIndex];
 
   return (
-    <div className="h-[calc(100vh-60px)] flex flex-col bg-slate-950 overflow-hidden relative">
+    <div className="h-[calc(100vh-60px)] flex flex-col bg-slate-950 overflow-hidden relative select-none">
       
-      {/* RENDER TOOLTIP PORTAL Ở ĐÂY (Nó sẽ nhảy ra body nên vị trí trong JSX ko quan trọng) */}
+      {/* TOOLTIP PORTAL */}
       {tooltipState && (
         <PokemonStatsTooltip 
           pokemon={tooltipState.pokemon} 
@@ -184,30 +194,32 @@ export default function MobileArena({
         />
       )}
 
-      {/* 1. BATTLE ARENA (Flex Grow) */}
+      {/* 1. BATTLE ARENA */}
       <div
         className="flex-grow relative bg-slate-900 bg-cover bg-center transition-all duration-800"
         style={{ backgroundImage: battleBackground ? `url('${battleBackground}')` : undefined }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80"></div>
 
-        {/* ENEMY SECTION (TOP RIGHT) */}
+        {/* ENEMY SECTION */}
         <div className="absolute top-4 right-4 z-10 flex flex-col items-end">
           <MobileHUD pokemon={enemyPokemon} isPlayer={false} />
           <TeamStatus team={enemyTeam} activeIdx={activeEnemyIndex} isEnemy={true} />
         </div>
 
-        {/* ENEMY SPRITE */}
+        {/* ENEMY SPRITE INTERACTION */}
         <div 
-            className="absolute bottom-0 right-4 z-20"
+            className="absolute bottom-0 right-4 z-20 touch-none" // touch-none giúp trình duyệt biết đây là vùng xử lý touch riêng
             onMouseEnter={(e) => handleMouseEnter(e, enemyPokemon, 'left')} 
             onMouseLeave={handleMouseLeave}
+            onTouchStart={(e) => handleTouchStart(e, enemyPokemon, 'left')} // Bắt đầu chạm
+            onTouchEnd={handleTouchEnd}    // Thả tay
+            onTouchCancel={handleTouchEnd} // Bị hủy (cuộc gọi đến, v.v.)
+            onContextMenu={(e) => e.preventDefault()} // Ngăn menu chuột phải/long-press menu của trình duyệt
         >
           <div className={`relative transition-all duration-300 ease-out 
               ${attackingSide === 'enemy' ? '-translate-x-8 scale-20' : ''}`}>
-            {/* Bóng đen dưới chân */}
             <div className="absolute top-10 right-1/2 -translate-x-1/2 w-20 h-4 bg-black/30 blur-md rounded-[100%]"></div>
-
             <img
               src={enemyPokemon.sprite}
               alt="Enemy"
@@ -218,23 +230,25 @@ export default function MobileArena({
           </div>
         </div>
 
-        {/* PLAYER SECTION (BOTTOM LEFT) */}
+        {/* PLAYER SECTION */}
         <div className="absolute top-4 left-4 z-10 flex flex-col items-start">
           <MobileHUD pokemon={playerPokemon} isPlayer={true} />
           <TeamStatus team={myTeam} activeIdx={activePlayerIndex} />
         </div>
         
-        {/* PLAYER SPRITE */}
+        {/* PLAYER SPRITE INTERACTION */}
         <div 
-            className="absolute bottom-0 left-4 z-20" 
+            className="absolute bottom-0 left-4 z-20 touch-none" 
             onMouseEnter={(e) => handleMouseEnter(e, playerPokemon, 'right')} 
             onMouseLeave={handleMouseLeave}
+            onTouchStart={(e) => handleTouchStart(e, playerPokemon, 'right')}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            onContextMenu={(e) => e.preventDefault()}
         >
           <div className={`relative transition-all duration-300 ease-out 
               ${attackingSide === 'player' ? 'translate-x-8 scale-20' : ''}`}>
-            {/* Bóng đen dưới chân */}
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-6 bg-black/40 blur-md rounded-[100%]"></div>
-
             <img
               src={playerPokemon.sprite}
               alt="Player"
@@ -259,7 +273,6 @@ export default function MobileArena({
       {/* 3. CONTROL PANEL */}
       <div className="h-[260px] bg-slate-900 border-t border-slate-700 p-3 pb-safe relative">
 
-        {/* --- SCENARIO 1: VICTORY / DEFEAT --- */}
         {winner ? (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in">
             <h2 className={`text-3xl font-black uppercase mb-4 ${winner === 'PLAYER' ? 'text-yellow-400' : 'text-red-500'}`}>
@@ -269,10 +282,7 @@ export default function MobileArena({
               <LogOut size={18} /> Return to Lobby
             </button>
           </div>
-        ) :
-
-          /* --- SCENARIO 2: SWITCH POKEMON --- */
-          (mustSwitch || controlView === 'switch') ? (
+        ) : (mustSwitch || controlView === 'switch') ? (
             <div className="absolute inset-0 z-40 bg-slate-900 p-3 flex flex-col animate-in slide-in-from-bottom-5">
               <div className="flex justify-between items-center mb-2">
                 <h3 className={`${mustSwitch ? 'text-red-500 animate-pulse' : 'text-blue-400'} font-bold text-sm`}>{mustSwitch ? `${playerPokemon.name} fainted!` : 'Switch Pokemon'}</h3>
@@ -284,11 +294,16 @@ export default function MobileArena({
                     key={idx}
                     disabled={p.currentHp === 0 || idx === activePlayerIndex}
                     onClick={() => handleSwitch(idx)}
-                    // Event Hover để hiển thị tooltip switch
+                    // SWITCH LIST INTERACTION (Touch & Hold)
                     onMouseEnter={(e) => handleMouseEnter(e, p, 'top')}
                     onMouseLeave={handleMouseLeave}
+                    onTouchStart={(e) => handleTouchStart(e, p, 'top')}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd}
+                    onContextMenu={(e) => e.preventDefault()}
+                    
                     className={`
-                                relative flex items-center gap-2 p-2 rounded-lg border transition-all text-left
+                                relative flex items-center gap-2 p-2 rounded-lg border transition-all text-left touch-none
                                 ${idx === activePlayerIndex ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700 bg-slate-800'}
                                 ${p.currentHp === 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'active:bg-slate-700'}
                             `}
@@ -306,13 +321,8 @@ export default function MobileArena({
                 ))}
               </div>
             </div>
-          ) :
-
-            /* --- SCENARIO 3: BATTLE CONTROLS (Main) --- */
-            (
+          ) : (
               <div className="flex flex-col h-full gap-2 relative">
-
-                {/* WAITING OVERLAY */}
                 {!isPlayerTurn && (
                   <div className="absolute inset-0 bg-slate-900/70 z-30 flex items-center justify-center backdrop-blur-[1px] rounded-lg">
                     <div className="bg-black/90 text-white px-4 py-2 rounded-full flex items-center gap-2 font-bold border border-white/10 text-sm shadow-xl">
@@ -320,8 +330,7 @@ export default function MobileArena({
                     </div>
                   </div>
                 )}
-
-                {/* MOVE GRID (2x2) */}
+                {/* MOVE GRID */}
                 <div className="grid grid-cols-2 gap-2 flex-grow">
                   {playerPokemon.moves.map((move, idx) => {
                     // @ts-ignore
@@ -329,9 +338,7 @@ export default function MobileArena({
                     return (
                       // @ts-ignore
                       <button key={idx} onClick={() => handleAttack(move)} disabled={!isPlayerTurn} className="relative overflow-hidden bg-slate-800 border border-slate-700 rounded-lg p-2 text-left active:scale-[0.98] transition-all group disabled:opacity-50">
-                        {/* Type Color Bar */}
                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${typeColor} opacity-80`}></div>
-
                         <div className="pl-2 flex flex-col justify-between h-full">
                           <div className="flex justify-between items-start">
                             <span className="font-bold text-slate-100 text-xs capitalize truncate max-w-[80%]">{move.name.replace(/-/g, ' ')}</span>
@@ -347,7 +354,7 @@ export default function MobileArena({
                   })}
                 </div>
 
-                {/* ACTION BUTTONS (Metrics & Switch) */}
+                {/* ACTION BUTTONS */}
                 <div className="grid grid-cols-2 gap-2 h-10 shrink-0">
                   <button
                     onClick={() => setShowMetrics(true)}
@@ -374,7 +381,6 @@ export default function MobileArena({
                 </div>
               </div>
             )}
-
       </div>
     </div>
   );
