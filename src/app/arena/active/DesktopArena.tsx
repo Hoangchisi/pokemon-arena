@@ -7,7 +7,6 @@ import { ArenaViewProps } from "./components/ArenaProps";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
-import { TYPE_COLORS } from "@/lib/constants";
 import { useBattleStore } from "@/hooks/useBattleStore"; // Import để lấy background nếu cần
 
 // --- INTERNAL HELPER COMPONENTS (Giống file gốc) ---

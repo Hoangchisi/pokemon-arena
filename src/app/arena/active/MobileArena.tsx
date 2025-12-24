@@ -9,7 +9,7 @@ import {
 import { ArenaViewProps } from "./components/ArenaProps";
 import { HealthBar } from "@/components/battle/HealthBar";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
-import { TYPE_COLORS } from "@/lib/constants";
+import { TYPE_COLORS } from "@/components/ui/TypeBadge";
 import { useBattleStore } from "@/hooks/useBattleStore";
 
 // --- INTERNAL COMPONENTS (Mobile Optimized) ---

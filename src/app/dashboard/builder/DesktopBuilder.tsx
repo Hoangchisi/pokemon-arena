@@ -3,9 +3,8 @@ import {
   Save, Trash2, Plus, LayoutList, ChevronDown, DownloadCloud, Loader2, Zap, Sparkles 
 } from "lucide-react";
 import { BuilderLayoutProps } from "@/components/builder/BuilderTypes";
-import { TypeBadge } from "@/components/ui/TypeBadge";
+import { TypeBadge ,  TYPE_COLORS, TYPE_GRADIENTS, ALL_TYPES} from "@/components/ui/TypeBadge";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
-import { TYPE_COLORS, TYPE_GRADIENTS, ALL_TYPES } from "@/lib/constants";
 
 // Component StatBar nội bộ (giữ nguyên style cũ)
 const StatBar = ({ label, value, max = 255, color = "bg-blue-500" }: { label: string, value: number, max?: number, color?: string }) => (
@@ -179,7 +178,7 @@ export default function DesktopBuilder({
                           <>
                             <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenTeraDropdownId(null); }} />
                             <div className="absolute top-full left-0 right-0 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 grid grid-cols-3 gap-1 p-2 w-48 animate-in fade-in zoom-in-95 duration-200">
-                              {ALL_TYPES.map((type) => (
+                              {ALL_TYPES.map((type: string) => (
                                 <button
                                   key={type}
                                   onClick={(e) => {

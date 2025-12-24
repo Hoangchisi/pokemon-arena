@@ -3,9 +3,8 @@ import {
   Menu, X, Plus, Save, Trash2, LayoutList, ChevronDown, DownloadCloud, Loader2, Zap 
 } from "lucide-react";
 import { BuilderLayoutProps } from "@/components/builder/BuilderTypes";
-import { TypeBadge } from "@/components/ui/TypeBadge";
+import { TypeBadge,  TYPE_COLORS, TYPE_GRADIENTS, ALL_TYPES} from "@/components/ui/TypeBadge";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
-import { TYPE_COLORS, TYPE_GRADIENTS, ALL_TYPES } from "@/lib/constants";
 
 export default function MobileBuilder({
   team, teamName, mySavedTeam, isSaving,isDataLoaded,
@@ -139,7 +138,7 @@ export default function MobileBuilder({
                                 <>
                                     <div className="fixed inset-0 z-20" onClick={() => setOpenTeraDropdownId(null)}/>
                                     <div className="absolute top-full left-0 z-30 w-full bg-slate-800 border border-slate-600 rounded mt-1 grid grid-cols-4 gap-1 p-2 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                                        {ALL_TYPES.map(t => (
+                                        {ALL_TYPES.map((t: string) => (
                                             <button key={t} onClick={() => {setTeam(prev => prev.map(m => m.uuid === member.uuid ? {...m, selectedTeraType: t}:m)); setOpenTeraDropdownId(null)}} 
                                                 className={`flex justify-center p-1 rounded border transition-all ${member.selectedTeraType === t ? 'border-cyan-500 bg-cyan-900/30' : 'border-transparent hover:bg-white/10'}`}>
                                                 <TypeBadge type={t} className="w-full h-6 text-[8px] flex items-center justify-center p-0"/>

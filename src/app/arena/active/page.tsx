@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
@@ -15,7 +15,18 @@ import { ArenaViewProps } from "./components/ArenaProps";
 import MobileArena from "./MobileArena";
 import DesktopArena from "./DesktopArena";
 
-export default function ArenaActivePage() {
+// --- LOADING COMPONENT ---
+// Tách ra để dùng chung cho cả Suspense fallback và lúc chờ data từ Store
+const LoadingScreen = ({ message = "Initializing Battle..." }: { message?: string }) => (
+  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4">
+    <RefreshCw className="animate-spin text-blue-500" size={40} />
+    <p className="font-mono animate-pulse">{message}</p>
+  </div>
+);
+
+// --- MAIN LOGIC COMPONENT ---
+// Component này chứa useSearchParams và logic game
+const ArenaContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -46,13 +57,16 @@ export default function ArenaActivePage() {
     }
   }, [winner, progressSaved, searchParams, updateProgress]);
 
-  // Loading Check
+  // Loading Check: Kiểm tra xem data trong store có tồn tại không
+  // Nếu user refresh trang, store có thể bị mất, cần redirect về lobby hoặc hiện nút quay lại
   if (!myTeam || myTeam.length === 0 || !enemyTeam || enemyTeam.length === 0) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4">
         <RefreshCw className="animate-spin text-blue-500" size={40} />
-        <p className="font-mono animate-pulse">Initializing Battle...</p>
-        <button onClick={() => router.push('/arena')} className="text-xs text-slate-500 hover:text-white underline">Return to Lobby</button>
+        <p className="font-mono animate-pulse">Battle Data Not Found...</p>
+        <button onClick={() => router.push('/arena')} className="text-xs text-slate-500 hover:text-white underline">
+          Return to Lobby
+        </button>
       </div>
     );
   }
@@ -102,5 +116,15 @@ export default function ArenaActivePage() {
         <DesktopArena {...viewProps} />
       </div>
     </>
+  );
+};
+
+// --- EXPORT DEFAULT PAGE ---
+// Bắt buộc phải có Suspense bao quanh component dùng useSearchParams
+export default function ArenaActivePage() {
+  return (
+    <Suspense fallback={<LoadingScreen message="Loading Arena Environment..." />}>
+      <ArenaContent />
+    </Suspense>
   );
 }
