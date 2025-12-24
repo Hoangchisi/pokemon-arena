@@ -12,8 +12,8 @@ export default function BackgroundMusic() {
   // Lắng nghe state currentMusic từ battle store
   const currentMusic = useBattleStore((state) => state.currentMusic);
   
-  // Mặc định volume nhỏ (20%)
-  const [volume, setVolume] = useState(0.2);
+  // Mặc định volume trung bình (40%)
+  const [volume, setVolume] = useState(0.4);
 
   // Hàm xác định nhạc
   const getTargetSource = (path: string) => {
@@ -107,29 +107,6 @@ export default function BackgroundMusic() {
   }, [volume]);
 
   return (
-    // UI: Chỉ hiển thị icon loa và thanh volume, không có nút bấm
-    <div className="fixed bottom-4 left-4 z-[100] flex items-center gap-2 bg-slate-900/50 hover:bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 hover:border-slate-500 p-2 rounded-full shadow-lg transition-all duration-300 group">
-      
-      {/* Hidden Audio */}
-      <audio ref={audioRef} src="/music/lobby.mp3" loop />
-
-      {/* Icon Loa (Chỉ để trang trí) */}
-      <div className={`w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center ${pathname.includes("active") || currentMusic ? "text-green-400" : "text-slate-500"}`}>
-        <Volume2 size={16} className={pathname.includes("active") || currentMusic ? "animate-pulse" : ""} />
-      </div>
-
-      {/* Thanh chỉnh Volume (Luôn hiện hoặc hiện khi hover tùy ý thích) */}
-      <div className="flex items-center gap-2 pr-2">
-        <input 
-            type="range" 
-            min="0" 
-            max="1" 
-            step="0.05"
-            value={volume}
-            onChange={(e) => setVolume(parseFloat(e.target.value))}
-            className="w-20 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-green-500 hover:h-1.5 transition-all"
-        />
-      </div>
-    </div>
+    <audio ref={audioRef} src="/music/lobby.mp3" loop />
   );
 }

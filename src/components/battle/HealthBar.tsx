@@ -3,6 +3,7 @@ import React from 'react';
 interface HealthBarProps {
   current: number;
   max: number;
+  isPlayer?: boolean;
 }
 
 export const HealthBar = ({ current, max }: HealthBarProps) => {

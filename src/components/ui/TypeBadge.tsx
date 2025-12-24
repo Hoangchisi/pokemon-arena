@@ -1,26 +1,5 @@
 import React from "react";
-
-// Bảng màu chuẩn (Nếu bạn muốn giữ màu đồng bộ ở 1 chỗ)
-const TYPE_COLORS: Record<string, string> = {
-  normal: "bg-neutral-500",
-  fire: "bg-orange-500",
-  water: "bg-blue-500",
-  electric: "bg-yellow-500",
-  grass: "bg-green-500",
-  ice: "bg-sky-400",
-  fighting: "bg-red-700",
-  poison: "bg-purple-500",
-  ground: "bg-amber-600",
-  flying: "bg-indigo-400",
-  psychic: "bg-pink-500",
-  bug: "bg-lime-500",
-  rock: "bg-stone-500",
-  ghost: "bg-violet-700",
-  dragon: "bg-indigo-600",
-  steel: "bg-slate-400",
-  dark: "bg-neutral-800",
-  fairy: "bg-pink-400",
-};
+import { TYPE_COLORS } from "@/lib/constants";
 
 interface TypeBadgeProps {
   type: string;
