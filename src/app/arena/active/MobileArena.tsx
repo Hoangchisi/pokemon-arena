@@ -216,6 +216,7 @@ export default function MobileArena({
             onTouchEnd={handleTouchEnd}    // Thả tay
             onTouchCancel={handleTouchEnd} // Bị hủy (cuộc gọi đến, v.v.)
             onContextMenu={(e) => e.preventDefault()} // Ngăn menu chuột phải/long-press menu của trình duyệt
+            onClick={handleTouchEnd}
         >
           <div className={`relative transition-all duration-300 ease-out 
               ${attackingSide === 'enemy' ? '-translate-x-8 scale-20' : ''}`}>
@@ -245,6 +246,7 @@ export default function MobileArena({
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
             onContextMenu={(e) => e.preventDefault()}
+            onClick={handleTouchEnd}
         >
           <div className={`relative transition-all duration-300 ease-out 
               ${attackingSide === 'player' ? 'translate-x-8 scale-20' : ''}`}>
@@ -293,7 +295,7 @@ export default function MobileArena({
                   <button
                     key={idx}
                     disabled={p.currentHp === 0 || idx === activePlayerIndex}
-                    onClick={() => handleSwitch(idx)}
+                    onClick={() => (handleSwitch(idx),handleTouchEnd())}
                     // SWITCH LIST INTERACTION (Touch & Hold)
                     onMouseEnter={(e) => handleMouseEnter(e, p, 'top')}
                     onMouseLeave={handleMouseLeave}
