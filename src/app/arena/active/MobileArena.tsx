@@ -186,7 +186,7 @@ export default function MobileArena({
 
       {/* 1. BATTLE ARENA (Flex Grow) */}
       <div
-        className="flex-grow relative bg-slate-900 bg-cover bg-center transition-all duration-1000"
+        className="flex-grow relative bg-slate-900 bg-cover bg-center transition-all duration-800"
         style={{ backgroundImage: battleBackground ? `url('${battleBackground}')` : undefined }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80"></div>
