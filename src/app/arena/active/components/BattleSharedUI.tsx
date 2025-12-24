@@ -2,9 +2,8 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 import { BattlePokemon, Move } from "@/types/battle";
 import { HealthBar } from "@/components/battle/HealthBar";
-import { TypeBadge } from "@/components/ui/TypeBadge";
+import { TypeBadge, TYPE_COLORS } from "@/components/ui/TypeBadge";
 import { CategoryBadge } from "@/components/battle/CategoryBadge";
-import { TYPE_COLORS } from "@/lib/constants";
 
 // 1. Pokemon Sprite
 export const PokemonSprite = ({ pokemon, isPlayer, isAttacking }: { pokemon: BattlePokemon, isPlayer: boolean, isAttacking: boolean }) => {
