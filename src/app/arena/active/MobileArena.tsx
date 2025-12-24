@@ -15,9 +15,16 @@ import { useBattleStore } from "@/hooks/useBattleStore";
 // --- INTERNAL COMPONENTS (Mobile Optimized) ---
 
 const TypeBadge = ({ type, className }: { type: string, className?: string }) => (
-  <span className={`${TYPE_COLORS[type]} text-white rounded px-1 ${className}`}>{type.toLocaleUpperCase()}</span>
+  <span className={`
+    ${TYPE_COLORS[type] || 'bg-slate-600'} 
+    text-white rounded-[3px] px-1 
+    font-bold tracking-wider font-sans
+    flex items-center justify-center
+    ${className}
+  `}>
+    {type.toLocaleUpperCase().slice(0, 3)}
+  </span>
 );
-
 const TeamStatus = ({ team, activeIdx, isEnemy = false }: { team: any[], activeIdx: number, isEnemy?: boolean }) => (
   <div className={`flex gap-1 mt-1 ${isEnemy ? 'justify-end' : 'justify-start'}`}>
     {team.map((p, i) => (
@@ -148,7 +155,7 @@ export default function MobileArena({
   const battleBackground = useBattleStore((s) => s.battleBackground);
 
   // --- LOGIC XỬ LÝ HOVER/TOUCH ---
-  
+
   // 1. Logic cho Desktop (Hover)
   const handleMouseEnter = (e: React.MouseEvent, pokemon: any, side: 'left' | 'right' | 'top' | 'bottom') => {
     // Chỉ kích hoạt nếu không phải là thiết bị cảm ứng (tùy chọn, nhưng giữ cả 2 cho hybrid)
@@ -164,7 +171,7 @@ export default function MobileArena({
   const handleTouchStart = (e: React.TouchEvent, pokemon: any, side: 'left' | 'right' | 'top' | 'bottom') => {
     // Ngăn chặn sự kiện click chuột ảo theo sau touch nếu cần thiết
     // e.preventDefault(); 
-    
+
     // Lấy vị trí phần tử
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltipState({ pokemon, anchorRect: rect, side });
@@ -184,13 +191,13 @@ export default function MobileArena({
 
   return (
     <div className="h-[calc(100vh-60px)] flex flex-col bg-slate-950 overflow-hidden relative select-none">
-      
+
       {/* TOOLTIP PORTAL */}
       {tooltipState && (
-        <PokemonStatsTooltip 
-          pokemon={tooltipState.pokemon} 
-          anchorRect={tooltipState.anchorRect} 
-          side={tooltipState.side} 
+        <PokemonStatsTooltip
+          pokemon={tooltipState.pokemon}
+          anchorRect={tooltipState.anchorRect}
+          side={tooltipState.side}
         />
       )}
 
@@ -208,15 +215,15 @@ export default function MobileArena({
         </div>
 
         {/* ENEMY SPRITE INTERACTION */}
-        <div 
-            className="absolute bottom-0 right-4 z-20 touch-none" // touch-none giúp trình duyệt biết đây là vùng xử lý touch riêng
-            onMouseEnter={(e) => handleMouseEnter(e, enemyPokemon, 'left')} 
-            onMouseLeave={handleMouseLeave}
-            onTouchStart={(e) => handleTouchStart(e, enemyPokemon, 'left')} // Bắt đầu chạm
-            onTouchEnd={handleTouchEnd}    // Thả tay
-            onTouchCancel={handleTouchEnd} // Bị hủy (cuộc gọi đến, v.v.)
-            onContextMenu={(e) => e.preventDefault()} // Ngăn menu chuột phải/long-press menu của trình duyệt
-            onClick={handleTouchEnd}
+        <div
+          className="absolute bottom-0 right-4 z-20 touch-none" // touch-none giúp trình duyệt biết đây là vùng xử lý touch riêng
+          onMouseEnter={(e) => handleMouseEnter(e, enemyPokemon, 'left')}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={(e) => handleTouchStart(e, enemyPokemon, 'left')} // Bắt đầu chạm
+          onTouchEnd={handleTouchEnd}    // Thả tay
+          onTouchCancel={handleTouchEnd} // Bị hủy (cuộc gọi đến, v.v.)
+          onContextMenu={(e) => e.preventDefault()} // Ngăn menu chuột phải/long-press menu của trình duyệt
+          onClick={handleTouchEnd}
         >
           <div className={`relative transition-all duration-300 ease-out 
               ${attackingSide === 'enemy' ? '-translate-x-8 scale-20' : ''}`}>
@@ -236,17 +243,17 @@ export default function MobileArena({
           <MobileHUD pokemon={playerPokemon} isPlayer={true} />
           <TeamStatus team={myTeam} activeIdx={activePlayerIndex} />
         </div>
-        
+
         {/* PLAYER SPRITE INTERACTION */}
-        <div 
-            className="absolute bottom-0 left-4 z-20 touch-none" 
-            onMouseEnter={(e) => handleMouseEnter(e, playerPokemon, 'right')} 
-            onMouseLeave={handleMouseLeave}
-            onTouchStart={(e) => handleTouchStart(e, playerPokemon, 'right')}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-            onContextMenu={(e) => e.preventDefault()}
-            onClick={handleTouchEnd}
+        <div
+          className="absolute bottom-0 left-4 z-20 touch-none"
+          onMouseEnter={(e) => handleMouseEnter(e, playerPokemon, 'right')}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={(e) => handleTouchStart(e, playerPokemon, 'right')}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={handleTouchEnd}
         >
           <div className={`relative transition-all duration-300 ease-out 
               ${attackingSide === 'player' ? 'translate-x-8 scale-20' : ''}`}>
@@ -285,104 +292,113 @@ export default function MobileArena({
             </button>
           </div>
         ) : (mustSwitch || controlView === 'switch') ? (
-            <div className="absolute inset-0 z-40 bg-slate-900 p-3 flex flex-col animate-in slide-in-from-bottom-5">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className={`${mustSwitch ? 'text-red-500 animate-pulse' : 'text-blue-400'} font-bold text-sm`}>{mustSwitch ? `${playerPokemon.name} fainted!` : 'Switch Pokemon'}</h3>
-                {!mustSwitch && (<button onClick={() => setControlView('main')} className="text-slate-400 p-1"><X size={20} /></button>)}
-              </div>
-              <div className="grid grid-cols-2 gap-2 overflow-y-auto pb-2 custom-scrollbar flex-grow">
-                {myTeam.map((p, idx) => (
-                  <button
-                    key={idx}
-                    disabled={p.currentHp === 0 || idx === activePlayerIndex}
-                    onClick={() => (handleSwitch(idx),handleTouchEnd())}
-                    // SWITCH LIST INTERACTION (Touch & Hold)
-                    onMouseEnter={(e) => handleMouseEnter(e, p, 'top')}
-                    onMouseLeave={handleMouseLeave}
-                    onTouchStart={(e) => handleTouchStart(e, p, 'top')}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchCancel={handleTouchEnd}
-                    onContextMenu={(e) => e.preventDefault()}
-                    
-                    className={`
+          <div className="absolute inset-0 z-40 bg-slate-900 p-3 flex flex-col animate-in slide-in-from-bottom-5">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className={`${mustSwitch ? 'text-red-500 animate-pulse' : 'text-blue-400'} font-bold text-sm`}>{mustSwitch ? `${playerPokemon.name} fainted!` : 'Switch Pokemon'}</h3>
+              {!mustSwitch && (<button onClick={() => setControlView('main')} className="text-slate-400 p-1"><X size={20} /></button>)}
+            </div>
+            <div className="grid grid-cols-2 gap-2 overflow-y-auto pb-2 custom-scrollbar flex-grow">
+              {myTeam.map((p, idx) => (
+                <button
+                  key={idx}
+                  disabled={p.currentHp === 0 || idx === activePlayerIndex}
+                  onClick={() => (handleSwitch(idx), handleTouchEnd())}
+                  // SWITCH LIST INTERACTION (Touch & Hold)
+                  onMouseEnter={(e) => handleMouseEnter(e, p, 'top')}
+                  onMouseLeave={handleMouseLeave}
+                  onTouchStart={(e) => handleTouchStart(e, p, 'top')}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
+                  onContextMenu={(e) => e.preventDefault()}
+
+                  className={`
                                 relative flex items-center gap-2 p-2 rounded-lg border transition-all text-left touch-none
                                 ${idx === activePlayerIndex ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700 bg-slate-800'}
                                 ${p.currentHp === 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'active:bg-slate-700'}
                             `}
-                  >
-                    <img src={p.sprite} className="w-10 h-10 pixelated object-contain shrink-0" />
-                    <div className="min-w-0 flex-grow">
-                      <span className="text-xs font-bold block truncate">{p.name}</span>
-                      <div className="w-full h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
-                        <div className={`h-full ${p.currentHp < p.maxHp / 5 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${(p.currentHp / p.maxHp) * 100}%` }}></div>
-                      </div>
-                      <span className="text-[9px] text-slate-400">{p.currentHp}/{p.maxHp} HP</span>
+                >
+                  <img src={p.sprite} className="w-10 h-10 pixelated object-contain shrink-0" />
+                  <div className="min-w-0 flex-grow">
+                    <span className="text-xs font-bold block truncate">{p.name}</span>
+                    <div className="w-full h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                      <div className={`h-full ${p.currentHp < p.maxHp / 5 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${(p.currentHp / p.maxHp) * 100}%` }}></div>
                     </div>
-                    {idx === activePlayerIndex && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-              <div className="flex flex-col h-full gap-2 relative">
-                {!isPlayerTurn && (
-                  <div className="absolute inset-0 bg-slate-900/70 z-30 flex items-center justify-center backdrop-blur-[1px] rounded-lg">
-                    <div className="bg-black/90 text-white px-4 py-2 rounded-full flex items-center gap-2 font-bold border border-white/10 text-sm shadow-xl">
-                      <RefreshCw className="animate-spin text-blue-400" size={16} /> <span>Opponent is thinking...</span>
-                    </div>
+                    <span className="text-[9px] text-slate-400">{p.currentHp}/{p.maxHp} HP</span>
                   </div>
-                )}
-                {/* MOVE GRID */}
-                <div className="grid grid-cols-2 gap-2 flex-grow">
-                  {playerPokemon.moves.map((move, idx) => {
-                    // @ts-ignore
-                    const typeColor = TYPE_COLORS[move.type] || "bg-slate-700";
-                    return (
-                      // @ts-ignore
-                      <button key={idx} onClick={() => handleAttack(move)} disabled={!isPlayerTurn} className="relative overflow-hidden bg-slate-800 border border-slate-700 rounded-lg p-2 text-left active:scale-[0.98] transition-all group disabled:opacity-50">
-                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${typeColor} opacity-80`}></div>
-                        <div className="pl-2 flex flex-col justify-between h-full">
-                          <div className="flex justify-between items-start">
-                            <span className="font-bold text-slate-100 text-xs capitalize truncate max-w-[80%]">{move.name.replace(/-/g, ' ')}</span>
-                            <CategoryBadge category={move.category} />
-                          </div>
-                          <div className="flex justify-between items-end text-[9px] text-slate-400 font-mono mt-1">
-                            <span>PWR: <b className="text-slate-200">{move.power || '-'}</b></span>
-                            <span>ACC: <b className="text-slate-200">{move.accuracy || '-'}%</b></span>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* ACTION BUTTONS */}
-                <div className="grid grid-cols-2 gap-2 h-10 shrink-0">
-                  <button
-                    onClick={() => setShowMetrics(true)}
-                    disabled={!isPlayerTurn}
-                    className={`
-                            rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50
-                            ${pendingMechanic ? 'bg-indigo-600 text-white ring-1 ring-yellow-400 animate-pulse' : 'bg-slate-700 text-slate-200 active:bg-slate-600'}
-                        `}
-                  >
-                    {pendingMechanic === 'mega' && <Crown size={14} className="text-yellow-400" />}
-                    {pendingMechanic === 'gmax' && <Zap size={14} className="text-red-400" />}
-                    {pendingMechanic === 'tera' && <Sparkles size={14} className="text-cyan-400" />}
-                    {!pendingMechanic && <Sparkles size={14} />}
-                    {pendingMechanic ? pendingMechanic.toUpperCase() : 'MECHANIC'}
-                  </button>
-
-                  <button
-                    onClick={() => setControlView('switch')}
-                    disabled={!isPlayerTurn}
-                    className="bg-yellow-600 text-black rounded-lg font-bold text-xs flex items-center justify-center gap-2 active:bg-yellow-500 disabled:opacity-50"
-                  >
-                    <ArrowLeftRight size={14} /> SWITCH
-                  </button>
+                  {idx === activePlayerIndex && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col h-full gap-2 relative">
+            {!isPlayerTurn && (
+              <div className="absolute inset-0 bg-slate-900/70 z-30 flex items-center justify-center backdrop-blur-[1px] rounded-lg">
+                <div className="bg-black/90 text-white px-4 py-2 rounded-full flex items-center gap-2 font-bold border border-white/10 text-sm shadow-xl">
+                  <RefreshCw className="animate-spin text-blue-400" size={16} /> <span>Opponent is thinking...</span>
                 </div>
               </div>
             )}
+            {/* MOVE GRID */}
+            <div className="grid grid-cols-2 gap-2 flex-grow">
+              {playerPokemon.moves.map((move, idx) => {
+                // @ts-ignore
+                const typeColor = TYPE_COLORS[move.type] || "bg-slate-700";
+                return (
+                  // @ts-ignore
+                  <button key={idx} onClick={() => handleAttack(move)} disabled={!isPlayerTurn} className="relative overflow-hidden bg-slate-800 border border-slate-700 rounded-lg p-2 text-left active:scale-[0.98] transition-all group disabled:opacity-50">
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${typeColor} opacity-80`}></div>
+                    <div className="pl-2 flex flex-col justify-between h-full">
+                      <div className="flex justify-between items-start">
+                        <span className="font-bold text-slate-100 text-xs capitalize truncate max-w-[80%]">{move.name.replace(/-/g, ' ')}</span>
+                        <div className="flex flex-col gap-1 items-center shrink-0 w-[42px]">
+                          <div className="w-full flex justify-center">
+                            <CategoryBadge category={move.category} />
+                          </div>
+                          <TypeBadge
+                            type={move.type}
+                            className="text-[9px] py-[1px] shadow-sm w-full"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-end text-[9px] text-slate-400 font-mono mt-1">
+                        <span>PWR: <b className="text-slate-200">{move.power || '-'}</b></span>
+                        <span>ACC: <b className="text-slate-200">{move.accuracy || '-'}%</b></span>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="grid grid-cols-2 gap-2 h-10 shrink-0">
+              <button
+                onClick={() => setShowMetrics(true)}
+                disabled={!isPlayerTurn}
+                className={`
+                            rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50
+                            ${pendingMechanic ? 'bg-indigo-600 text-white ring-1 ring-yellow-400 animate-pulse' : 'bg-slate-700 text-slate-200 active:bg-slate-600'}
+                        `}
+              >
+                {pendingMechanic === 'mega' && <Crown size={14} className="text-yellow-400" />}
+                {pendingMechanic === 'gmax' && <Zap size={14} className="text-red-400" />}
+                {pendingMechanic === 'tera' && <Sparkles size={14} className="text-cyan-400" />}
+                {!pendingMechanic && <Sparkles size={14} />}
+                {pendingMechanic ? pendingMechanic.toUpperCase() : 'MECHANIC'}
+              </button>
+
+              <button
+                onClick={() => setControlView('switch')}
+                disabled={!isPlayerTurn}
+                className="bg-yellow-600 text-black rounded-lg font-bold text-xs flex items-center justify-center gap-2 active:bg-yellow-500 disabled:opacity-50"
+              >
+                <ArrowLeftRight size={14} /> SWITCH
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
