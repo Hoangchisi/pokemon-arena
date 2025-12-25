@@ -14,6 +14,7 @@ import { MetricsModal } from "@/components/battle/MetricsModal";
 import { ArenaViewProps } from "./components/ArenaProps";
 import MobileArena from "./MobileArena";
 import DesktopArena from "./DesktopArena";
+import toast from "react-hot-toast";
 
 // --- LOADING COMPONENT ---
 // Tách ra để dùng chung cho cả Suspense fallback và lúc chờ data từ Store
@@ -31,35 +32,73 @@ const ArenaContent = () => {
   const searchParams = useSearchParams();
 
   // Stores
-  const { 
-    myTeam, enemyTeam, activePlayerIndex, activeEnemyIndex, 
+  const {
+    myTeam, enemyTeam, activePlayerIndex, activeEnemyIndex,
     isPlayerTurn, winner, logs, attackingSide, mustSwitch,
-    executeTurn, switchPokemon, playerUsedMechanics 
+    executeTurn, switchPokemon, playerUsedMechanics
   } = useBattleStore();
   const { updateProgress } = useUserStore();
 
   // Local State
+  const [isMounted, setIsMounted] = useState(false);
   const [controlView, setControlView] = useState<'main' | 'fight' | 'switch'>('main');
   const [showMetrics, setShowMetrics] = useState(false);
   const [pendingMechanic, setPendingMechanic] = useState<'mega' | 'gmax' | 'tera' | null>(null);
   const [progressSaved, setProgressSaved] = useState(false);
 
+  // Check Mount & Redirect nếu không có team
+  useEffect(() => {
+    setIsMounted(true);
+    if (!myTeam || myTeam.length === 0) {
+      router.push("/arena");
+    }
+  }, [myTeam, router]);
+
   // Handle Win/Progress
   useEffect(() => {
     if (winner === 'PLAYER' && !progressSaved) {
       const stageKey = searchParams.get('stage');
+
       if (stageKey) {
-        setProgressSaved(true);
+        setProgressSaved(true); // Khóa ngay lập tức
+
         // @ts-ignore
-        const idx = STAGE_ORDER.indexOf(stageKey);
-        if (idx !== -1) updateProgress(idx + 1);
+        const stageIndex = STAGE_ORDER.indexOf(stageKey);
+
+        if (stageIndex !== -1) {
+          const nextStageLevel = stageIndex + 1;
+          console.log(`Victory against ${stageKey} (Current Stage: ${stageIndex})`);
+
+          // 1. CẬP NHẬT CLIENT STORE NGAY LẬP TỨC (Optimistic UI)
+          // Giúp khi quay lại Lobby thấy mở khóa ngay mà không cần fetch lại
+          updateProgress(nextStageLevel);
+
+          // 2. GỌI API LƯU DATABASE (Chạy ngầm)
+          const saveToDb = async () => {
+            try {
+              const res = await fetch('/api/user/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stageUnlocked: nextStageLevel })
+              });
+
+              if (!res.ok) throw new Error("API Save failed");
+              toast.success("Progress Saved! Next champion unlocked.");
+            } catch (err) {
+              console.error("Save progress error:", err);
+
+            }
+          };
+
+          saveToDb();
+        }
       }
     }
   }, [winner, progressSaved, searchParams, updateProgress]);
 
   // Loading Check: Kiểm tra xem data trong store có tồn tại không
   // Nếu user refresh trang, store có thể bị mất, cần redirect về lobby hoặc hiện nút quay lại
-  if (!myTeam || myTeam.length === 0 || !enemyTeam || enemyTeam.length === 0) {
+  if (!isMounted || !myTeam || myTeam.length === 0 || !enemyTeam || enemyTeam.length === 0) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4">
         <RefreshCw className="animate-spin text-blue-500" size={40} />
@@ -96,16 +135,16 @@ const ArenaContent = () => {
 
   return (
     <>
-      <MetricsModal 
-        isOpen={showMetrics} 
-        onClose={() => setShowMetrics(false)} 
+      <MetricsModal
+        isOpen={showMetrics}
+        onClose={() => setShowMetrics(false)}
         pokemon={playerMon}
         selectedOption={pendingMechanic}
         onSelectOption={setPendingMechanic}
         isPlayerTurn={isPlayerTurn}
         usedMechanics={playerUsedMechanics}
       />
-      
+
       {/* Mobile View */}
       <div className="lg:hidden">
         <MobileArena {...viewProps} />
