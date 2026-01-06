@@ -66,14 +66,16 @@ Follow these steps to set up the project locally.
    cd your-repo-name
    
 2. **Install dependencies**
-npm install
-# or
-yarn install
+   ```bash
+   npm install
+   # or
+   yarn install   
 
 3. **Environment Setup**
 Create a .env.local file in the root directory and configure your database variables:
-DATABASE_URL="your_database_connection_string"
-# Add other API keys if necessary
+   ```bash
+   DATABASE_URL="your_database_connection_string"
+   # Add other API keys if necessary
 
 4. **Run the development server**
 Bash
@@ -84,22 +86,22 @@ Navigate to http://localhost:3000 to see the app running.
 
 📂 Project Structure
 A quick look at the core structure:
-
-src/
-├── app/
-│   ├── arena/           # Battle routes (Active battle, Lobby)
-│   ├── api/             # Server-side API routes (User progress, Team data)
-│   └── page.tsx         # Home page
-├── components/
-│   ├── battle/          # Battle-specific components (HealthBar, HUD, Tooltips)
-│   ├── ui/              # Reusable UI elements (TypeBadge, Buttons)
-│   └── mobile-arena.tsx # Mobile specific layout logic
-├── hooks/
-│   ├── useBattleStore.ts # Core battle logic & state (Zustand)
-│   └── useUserStore.ts   # User data & persistence
-├── lib/
-│   └── constants.ts     # Game constants (Type charts, Move data)
-└── types/               # TypeScript interfaces
+   ```bash
+   src/
+   ├── app/
+   │   ├── arena/           # Battle routes (Active battle, Lobby)
+   │   ├── api/             # Server-side API routes (User progress, Team data)
+   │   └── page.tsx         # Home page
+   ├── components/
+   │   ├── battle/          # Battle-specific components (HealthBar, HUD, Tooltips)
+   │   ├── ui/              # Reusable UI elements (TypeBadge, Buttons)
+   │   └── mobile-arena.tsx # Mobile specific layout logic
+   ├── hooks/
+   │   ├── useBattleStore.ts # Core battle logic & state (Zustand)
+   │   └── useUserStore.ts   # User data & persistence
+   ├── lib/
+   │   └── constants.ts     # Game constants (Type charts, Move data)
+   └── types/               # TypeScript interfaces
 🤝 Contributing
 Contributions are welcome! If you have ideas for new features (e.g., PvP multiplayer, new Gen 9 Pokémon), feel free to fork the repository and submit a Pull Request.
 
